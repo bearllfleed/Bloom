@@ -1,0 +1,128 @@
+/**
+ * 今日页（第 1 期 1-2）：顶栏 + 月/周日历 + 选中日期的项目列表。
+ * 选中过去的日期打卡就是补卡，不弹任何提示；未来日期只能看不能打。
+ */
+import { useEffect, useRef, type ComponentRef } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { addDays, formatMonthDayWeekday } from '@/domain/date';
+import { listTitle } from '@/copy/today';
+import { useLiveQuery } from '@/features/common/useLiveQuery';
+import { Calendar } from '@/features/today/Calendar';
+import { usePlanted } from '@/features/today/celebration';
+import { PerfectDayLayer } from '@/features/today/PerfectDay';
+import { TodayCard } from '@/features/today/TodayCard';
+import { TodayEmpty } from '@/features/today/TodayEmpty';
+import { TodayHeader } from '@/features/today/TodayHeader';
+import { getCalendarBounds, getDayView } from '@/services/queries';
+import { usePrefs } from '@/stores/prefsStore';
+import { useTodayStore } from '@/stores/todayStore';
+import { AppText } from '@/ui/components/AppText';
+import { DotPaper } from '@/ui/components/DotPaper';
+import type { DuoduoMood } from '@/ui/illustrations/Duoduo';
+import { useMotionReduced } from '@/ui/motion';
+import { inset, space } from '@/ui/tokens';
+
+export default function TodayScreen() {
+  const insets = useSafeAreaInsets();
+  const reduced = useMotionReduced();
+  const selected = useTodayStore((s) => s.selectedDate);
+  const jumpToken = useTodayStore((s) => s.jumpToken);
+  const select = useTodayStore((s) => s.select);
+  const backToToday = useTodayStore((s) => s.backToToday);
+  const calendarMode = usePrefs((s) => s.calendarMode);
+  const weekStart = usePrefs((s) => s.weekStart);
+  const update = usePrefs((s) => s.update);
+  const plantedId = usePlanted((s) => s.projectId);
+  const clearPlanted = usePlanted((s) => s.clear);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+
+  const view = useLiveQuery(() => getDayView(selected), [selected]);
+  const todayView = useLiveQuery(() => getDayView(view.today), [view.today]);
+  const bounds = useLiveQuery(getCalendarBounds, []);
+
+  const noProjects = view.empty === 'noProjects';
+  const mode = noProjects ? 'week' : calendarMode;
+  const plantedVisible = plantedId !== null && view.items.some((i) => i.project.id === plantedId);
+
+  useEffect(() => {
+    if (!plantedVisible) return;
+    const timer = setTimeout(() => {
+      scroll.current?.scrollToEnd({ animated: true });
+      clearPlanted();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [clearPlanted, plantedVisible]);
+
+  const mood: DuoduoMood =
+    todayView.overview.planned === 0
+      ? 'sleepy'
+      : todayView.overview.isPerfect
+        ? 'happy'
+        : todayView.overview.completed > 0
+          ? 'cheer'
+          : 'expectant';
+
+  const title = listTitle({
+    date: selected,
+    today: view.today,
+    yesterday: addDays(view.today, -1),
+    dateLabel: formatMonthDayWeekday(selected),
+    completed: view.overview.completed,
+    planned: view.overview.planned,
+    visibleCount: view.items.length,
+    perfect: view.overview.isPerfect,
+  });
+
+  return (
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <DotPaper style={StyleSheet.absoluteFill} />
+      <TodayHeader today={view.today} mood={mood} />
+      <ScrollView ref={scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Calendar
+          selected={selected}
+          today={view.today}
+          bounds={bounds}
+          mode={mode}
+          weekStart={weekStart}
+          jumpToken={jumpToken}
+          onSelect={select}
+          onModeChange={(m) => update({ calendarMode: m })}
+          onBackToToday={backToToday}
+        />
+        <Animated.View key={selected} entering={reduced ? undefined : FadeIn.duration(200)} style={styles.list}>
+          {view.items.length > 0 ? (
+            <AppText variant="callout" tone={view.overview.isPerfect ? 'link' : 'secondary'} style={styles.title}>
+              {title}
+            </AppText>
+          ) : null}
+          {view.items.map((item, index) => (
+            <Animated.View
+              key={item.project.id}
+              entering={
+                reduced
+                  ? undefined
+                  : item.project.id === plantedId
+                    ? ZoomIn.springify().damping(14)
+                    : FadeInDown.delay(Math.min(index, 6) * 40).duration(240)
+              }
+            >
+              <TodayCard item={item} date={selected} today={view.today} />
+            </Animated.View>
+          ))}
+          {view.empty ? <TodayEmpty reason={view.empty} isToday={selected === view.today} /> : null}
+        </Animated.View>
+      </ScrollView>
+      <PerfectDayLayer />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  content: { paddingBottom: space.giant * 2 },
+  list: { paddingHorizontal: inset.page, gap: inset.cardGap, marginTop: space.sm },
+  title: { marginLeft: 4 },
+});
