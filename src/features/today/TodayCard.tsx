@@ -4,8 +4,9 @@
  * - 完成后底色从花苞中心圆形扩散为项目浅色（M02 卡片部分）。
  */
 import { useRouter } from 'expo-router';
-import { useRef, useState, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { formatClock } from '@/domain/date';
 import type { LocalDate } from '@/domain/types';
@@ -41,13 +42,30 @@ export function subtitleOf(item: DayItem, date: LocalDate, today: LocalDate): st
   return project.motto;
 }
 
-export function TodayCard({ item, date, today }: { item: DayItem; date: LocalDate; today: LocalDate }) {
+export function TodayCard({
+  item,
+  date,
+  today,
+  pulseToken = 0,
+}: {
+  item: DayItem;
+  date: LocalDate;
+  today: LocalDate;
+  /** 变化时把卡片轻轻弹一下，用来响应通知点击 */
+  pulseToken?: number;
+}) {
   const router = useRouter();
   const { scheme } = useTheme();
   const { project, state } = item;
   const color = projectColorOf(project.colorId);
   const anchor = useRef<ComponentRef<typeof View>>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (pulseToken === 0) return;
+    scale.value = withSequence(withTiming(1.02, { duration: 180 }), withTiming(1, { duration: 220 }));
+  }, [pulseToken, scale]);
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const openMenu = (withDetail: boolean) => {
     const items: MenuItem[] = [];
@@ -80,7 +98,7 @@ export function TodayCard({ item, date, today }: { item: DayItem; date: LocalDat
   const reach = Math.hypot(size.width, size.height);
 
   return (
-    <View ref={anchor} collapsable={false}>
+    <Animated.View ref={anchor} collapsable={false} style={pulseStyle}>
       <StickerCard
         padding={0}
         onPress={() => router.push(`/project/${project.id}`)}
@@ -125,7 +143,7 @@ export function TodayCard({ item, date, today }: { item: DayItem; date: LocalDat
           />
         </View>
       </StickerCard>
-    </View>
+    </Animated.View>
   );
 }
 

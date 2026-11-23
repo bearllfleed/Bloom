@@ -3,6 +3,7 @@
  * 暂停给 3 秒撤销；删除先确认、写明记录数，之后 5 秒撤销。
  */
 import type { ProjectEntity } from '@/domain/types';
+import { graduationCopy } from '@/copy/phase2';
 import { confirmCopy } from '@/copy/project';
 import { toastCopy } from '@/copy/today';
 import { haptics } from '@/platform/haptics';
@@ -24,6 +25,19 @@ export function resumeProject(project: ProjectEntity): void {
   if (!projectService.resume(project.id)) return;
   haptics.soft();
   overlay.toast(toastCopy.resumed(project.name));
+}
+
+/** 提前毕业：确认后进入已毕业，典礼由队列补上 */
+export async function graduateEarly(project: ProjectEntity): Promise<boolean> {
+  const confirmed = await overlay.confirm({
+    title: graduationCopy.earlyTitle(project.name),
+    message: graduationCopy.earlyMessage,
+    confirmLabel: graduationCopy.earlyConfirm,
+    cancelLabel: graduationCopy.earlyCancel,
+  });
+  if (!confirmed) return false;
+  haptics.success();
+  return projectService.graduateNow(project.id);
 }
 
 /** 删除：确认后返回 true（调用方可据此离开详情页） */

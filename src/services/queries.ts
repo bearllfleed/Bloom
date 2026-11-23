@@ -283,6 +283,10 @@ export function getDayRecords(projectId: string, date: LocalDate): DayRecordsVie
   };
 }
 
+export function getProjectRecords(projectId: string): CheckinRecord[] {
+  return checkinRepo.listForProject(projectId);
+}
+
 export function getRecentRecords(projectId: string, limit = 5): CheckinRecord[] {
   return checkinRepo.recent(projectId, limit);
 }

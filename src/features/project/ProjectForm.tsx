@@ -4,8 +4,8 @@
  * - 选图标后，没手动选过颜色时颜色跟随图标分类的推荐色；
  * - 编辑：频率改动后提示"从今天起按新频率计算"；已毕业项目频率、日期、时长置灰。
  */
-import { usePreventRemove } from 'expo-router';
-import { useState } from 'react';
+import { usePreventRemove, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,9 +14,11 @@ import { formatMonthDay } from '@/domain/date';
 import { describeRule, durationLabel, isSameRule, type DurationPreset } from '@/domain/project';
 import type { LocalDate, WeekStart } from '@/domain/types';
 import { randomEncouragement } from '@/copy/encouragement';
+import { reminderCopy } from '@/copy/phase2';
 import { confirmCopy, formCopy } from '@/copy/project';
 import { templates, type ProjectTemplate } from '@/copy/templates';
 import { haptics } from '@/platform/haptics';
+import { notifications, type PermissionState } from '@/platform/notifications';
 import type { ProjectDraft, SaveError } from '@/services/projectService';
 import { overlay } from '@/stores/overlayQueue';
 import { AppText } from '@/ui/components/AppText';
@@ -37,6 +39,7 @@ import { PROJECT_COLOR_IDS, inset, radius, space } from '@/ui/tokens';
 import { applyTemplate, isDraftDirty } from './draft';
 import { FrequencySheet } from './FrequencySheet';
 import { IconPickerSheet, recommendedColorOf } from './IconPickerSheet';
+import { ReminderSheet } from './ReminderSheet';
 import { ScheduleSheet } from './ScheduleSheet';
 
 export interface ProjectFormProps {
@@ -48,6 +51,8 @@ export interface ProjectFormProps {
   originalName?: string;
   graduated?: boolean;
   earliestRecord?: LocalDate | null;
+  /** 再来一轮时替换标题 */
+  heading?: string;
   onSubmit: (draft: ProjectDraft) => { ok: true } | { ok: false; error: SaveError };
   onClose: () => void;
 }
@@ -86,15 +91,21 @@ export function ProjectForm({
   originalName,
   graduated = false,
   earliestRecord = null,
+  heading,
   onSubmit,
   onClose,
 }: ProjectFormProps) {
+  const router = useRouter();
   const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const reduced = useMotionReduced();
   const [draft, setDraft] = useState(initial);
   const [colorTouched, setColorTouched] = useState(mode === 'edit');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [permission, setPermission] = useState<PermissionState>('undetermined');
+  useEffect(() => {
+    void notifications.permission().then(setPermission);
+  }, [draft.reminders]);
   const dice = useSharedValue(0);
   const color = projectColorOf(draft.colorId);
   const dirty = isDraftDirty(draft, initial);
@@ -159,6 +170,38 @@ export function ProjectForm({
     ));
   };
 
+  const openReminders = () => {
+    overlay.openSheet((close) => (
+      <ReminderSheet
+        reminders={draft.reminders}
+        skipDone={draft.remindSkipDone}
+        skipPeriodMet={draft.remindSkipPeriodMet}
+        rule={draft.rule}
+        onOpenCheck={() => {
+          close();
+          router.push('/settings/reminders');
+        }}
+        onDone={(value) => {
+          set({
+            reminders: value.reminders,
+            remindSkipDone: value.skipDone,
+            remindSkipPeriodMet: value.skipPeriodMet,
+          });
+          close();
+          void notifications.permission().then(setPermission);
+        }}
+      />
+    ));
+  };
+
+  const enabledTimes = draft.reminders.filter((item) => item.enabled).map((item) => item.time);
+  const reminderLabel =
+    enabledTimes.length > 0
+      ? enabledTimes.join('、')
+      : draft.reminders.length > 0
+        ? reminderCopy.off
+        : reminderCopy.unset;
+
   const openIcons = () => {
     overlay.openSheet((close) => (
       <IconPickerSheet
@@ -199,7 +242,7 @@ export function ProjectForm({
 
   const ruleChanged = mode === 'edit' && !isSameRule(draft.rule, initial.rule);
   const headTint = scheme === 'dark' ? `${color.base}33` : color.tint;
-  const title = mode === 'create' ? formCopy.newTitle : formCopy.editTitle(originalName ?? draft.name);
+  const title = heading ?? (mode === 'create' ? formCopy.newTitle : formCopy.editTitle(originalName ?? draft.name));
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -290,6 +333,16 @@ export function ProjectForm({
               )}
               onPress={() => openSchedule('duration')}
               disabled={graduated}
+              showDivider
+            />
+            <ListRow
+              icon="bell"
+              label={reminderCopy.row}
+              value={reminderLabel}
+              hint={permission === 'denied' && draft.reminders.length > 0 ? reminderCopy.permissionOff : undefined}
+              hintTone="warning"
+              onHintPress={() => router.push('/settings/reminders')}
+              onPress={openReminders}
               showDivider
             />
           </StickerCard>

@@ -3,14 +3,18 @@
  * 第 2、3 期在列表中追加心情手账、提醒检查、备份与恢复、偏好设置。
  */
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { trustCopy } from '@/copy/common';
+import { backupCopy, mePhaseCopy } from '@/copy/phase2';
 import { meCopy } from '@/copy/project';
 import { useLiveQuery } from '@/features/common/useLiveQuery';
 import { openProfileSheet } from '@/features/settings/ProfileSheet';
 import { isDevToolsEnabled } from '@/platform/appVariant';
+import { notifications } from '@/platform/notifications';
+import { backupService } from '@/services/backupService';
 import { companionDays } from '@/services/lifecycleService';
 import { usePrefs } from '@/stores/prefsStore';
 import { AppText } from '@/ui/components/AppText';
@@ -28,6 +32,11 @@ export default function MeScreen() {
   const nickname = usePrefs((s) => s.nickname);
   const avatarId = usePrefs((s) => s.avatarId);
   const days = useLiveQuery(companionDays, []);
+  const backup = useLiveQuery(() => backupService.status(), []);
+  const [reminderProblem, setReminderProblem] = useState(false);
+  useEffect(() => {
+    void notifications.permission().then((state) => setReminderProblem(state !== 'granted'));
+  }, []);
 
   return (
     <DotPaper style={{ paddingTop: insets.top }}>
@@ -59,6 +68,28 @@ export default function MeScreen() {
 
         <StickerCard padding={0}>
           <ListRow icon="history" label={meCopy.history} onPress={() => router.push('/history')} />
+          <ListRow
+            icon="bell"
+            label={mePhaseCopy.reminders}
+            value={reminderProblem ? '●' : undefined}
+            valueTone="warning"
+            onPress={() => router.push('/settings/reminders')}
+            showDivider
+          />
+          <ListRow
+            icon="cloud"
+            label={mePhaseCopy.backup}
+            value={backup.due ? backupCopy.due : backup.label}
+            valueTone={backup.due ? 'warning' : 'secondary'}
+            onPress={() => router.push('/settings/backup')}
+            showDivider
+          />
+          <ListRow
+            icon="settings"
+            label={mePhaseCopy.preferences}
+            onPress={() => router.push('/settings/preferences')}
+            showDivider
+          />
           <ListRow icon="star" label={meCopy.about} onPress={() => router.push('/settings/about')} showDivider />
         </StickerCard>
 

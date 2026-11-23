@@ -11,8 +11,10 @@ import { clock } from '@/platform/clock';
 import { createLogger } from '@/platform/logger';
 import { applyPrefsOnLaunch } from '@/stores/prefsStore';
 
+import { backupService } from './backupService';
 import { events } from './events';
 import { projectService } from './projectService';
+import { reminderService } from './reminderService';
 
 const log = createLogger('lifecycle');
 
@@ -32,6 +34,7 @@ export function bootstrap(): BootResult {
   getDatabase().runSync("INSERT OR IGNORE INTO meta (key, value) VALUES ('first_use_date', ?)", [clock.today()]);
   projectService.purgeDeleted();
   projectService.autoGraduate();
+  reminderService.start();
   log.info('启动完成');
   booted = { ok: true };
   return booted;
@@ -40,6 +43,7 @@ export function bootstrap(): BootResult {
 export function onForeground(): void {
   if (!booted?.ok) return;
   projectService.autoGraduate();
+  backupService.maybeWeeklySnapshot();
   events.emit({ type: 'dataReplaced' });
 }
 

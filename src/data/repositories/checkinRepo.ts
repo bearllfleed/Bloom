@@ -121,6 +121,12 @@ export const checkinRepo = {
     );
   },
 
+  listForProject(projectId: string): CheckinRecord[] {
+    return getDatabase()
+      .getAllSync<CheckinRow>('SELECT * FROM checkins WHERE project_id = ? ORDER BY date, checked_at', [projectId])
+      .map(toCheckin);
+  },
+
   recent(projectId: string, limit: number): CheckinRecord[] {
     return getDatabase()
       .getAllSync<CheckinRow>(
@@ -153,6 +159,39 @@ export const checkinRepo = {
         projectId ? [`${month}-01`, `${month}-31`, projectId] : [`${month}-01`, `${month}-31`],
       )
       .map(toCheckin);
+  },
+
+  /** 有备注的记录，新的在前 */
+  listNotes(projectId: string, limit: number): CheckinRecord[] {
+    return getDatabase()
+      .getAllSync<CheckinRow>(
+        `SELECT * FROM checkins WHERE project_id = ? AND note IS NOT NULL AND note != ''
+         ORDER BY date DESC, checked_at DESC LIMIT ?`,
+        [projectId, limit],
+      )
+      .map(toCheckin);
+  },
+
+  noteCount(projectId: string): number {
+    return (
+      getDatabase().getFirstSync<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM checkins WHERE project_id = ? AND note IS NOT NULL AND note != ''`,
+        [projectId],
+      )?.n ?? 0
+    );
+  },
+
+  /** 习惯统计用：归属日期和实际打卡时刻 */
+  listInstants(): { projectId: string; date: LocalDate; checkedAt: number }[] {
+    return getDatabase()
+      .getAllSync<{ project_id: string; date: string; checked_at: number }>(
+        'SELECT project_id, date, checked_at FROM checkins',
+      )
+      .map((row) => ({ projectId: row.project_id, date: row.date, checkedAt: row.checked_at }));
+  },
+
+  listAll(): CheckinRecord[] {
+    return getDatabase().getAllSync<CheckinRow>('SELECT * FROM checkins ORDER BY date, checked_at').map(toCheckin);
   },
 
   totalCount(): number {

@@ -8,21 +8,25 @@ import { useState } from 'react';
 import { formatMonthDay } from '@/domain/date';
 import { templateById } from '@/copy/templates';
 import { toastCopy } from '@/copy/today';
-import { applyTemplate, defaultDraft } from '@/features/project/draft';
+import { graduationCopy } from '@/copy/phase2';
+import { anotherRoundDraft, applyTemplate, defaultDraft } from '@/features/project/draft';
 import { ProjectForm } from '@/features/project/ProjectForm';
 import { usePlanted } from '@/features/today/celebration';
 import { clock } from '@/platform/clock';
 import { haptics } from '@/platform/haptics';
 import { projectService } from '@/services/projectService';
+import { getProject } from '@/services/queries';
 import { overlay } from '@/stores/overlayQueue';
 import { usePrefs } from '@/stores/prefsStore';
 
 export default function NewProjectScreen() {
   const router = useRouter();
-  const { template } = useLocalSearchParams<{ template?: string }>();
+  const { template, from } = useLocalSearchParams<{ template?: string; from?: string }>();
   const weekStart = usePrefs((s) => s.weekStart);
   const [today] = useState(() => clock.today());
+  const [source] = useState(() => (from ? getProject(from) : null));
   const [initial] = useState(() => {
+    if (source) return anotherRoundDraft(source, today);
     const base = defaultDraft(today);
     const t = templateById(template);
     return t ? applyTemplate(base, t) : base;
@@ -34,6 +38,7 @@ export default function NewProjectScreen() {
       initial={initial}
       today={today}
       weekStart={weekStart}
+      heading={source ? graduationCopy.againTitle(source.name) : undefined}
       onSubmit={(draft) => {
         const result = projectService.create(draft);
         if (!result.ok) return result;

@@ -25,6 +25,11 @@ import { events } from './events';
 const log = createLogger('project');
 
 /** 表单提交的内容 */
+export interface ReminderDraft {
+  time: string;
+  enabled: boolean;
+}
+
 export interface ProjectDraft {
   name: string;
   iconId: string;
@@ -36,6 +41,11 @@ export interface ProjectDraft {
   startDate: LocalDate;
   endDate: LocalDate | null;
   durationPreset: string | null;
+  reminders: ReminderDraft[];
+  remindSkipDone: boolean;
+  remindSkipPeriodMet: boolean;
+  /** 再来一轮时指向原来的项目 */
+  previousProjectId?: string | null;
 }
 
 export type SaveError = 'nameEmpty' | 'startAfterRecords' | 'endBeforeToday' | 'endBeforeStart' | 'notFound';
@@ -55,7 +65,15 @@ export const projectService = {
   create(draft: ProjectDraft): { ok: true; id: string } | { ok: false; error: SaveError } {
     const error = validateSchedule(draft, clock.today(), null);
     if (error) return { ok: false, error };
-    const id = projectRepo.create({ ...draft, name: draft.name.trim(), motto: draft.motto.trim() });
+    const id = projectRepo.create({
+      ...draft,
+      name: draft.name.trim(),
+      motto: draft.motto.trim(),
+      reminders: draft.reminders,
+      remindSkipDone: draft.remindSkipDone,
+      remindSkipPeriodMet: draft.remindSkipPeriodMet,
+      previousProjectId: draft.previousProjectId ?? null,
+    });
     log.info('新建项目');
     events.emit({ type: 'projectChanged', projectId: id });
     return { ok: true, id };
@@ -77,8 +95,15 @@ export const projectService = {
       noteEnabled: draft.noteEnabled,
     };
 
+    const saveReminders = () => {
+      projectRepo.updateRemindFlags(projectId, draft.remindSkipDone, draft.remindSkipPeriodMet);
+      projectRepo.replaceReminders(projectId, draft.reminders);
+    };
     if (project.status === 'graduated') {
-      projectRepo.updateInfo(projectId, info);
+      db.withTransactionSync(() => {
+        projectRepo.updateInfo(projectId, info);
+        saveReminders();
+      });
     } else {
       const error = validateSchedule(draft, today, checkinRepo.earliestDate(projectId));
       if (error) return { ok: false, error };
@@ -93,6 +118,7 @@ export const projectService = {
         } else if (ruleChanged) {
           projectRepo.upsertRule(projectId, today, draft.rule);
         }
+        saveReminders();
       });
     }
     events.emit({ type: 'projectChanged', projectId });
@@ -164,6 +190,33 @@ export const projectService = {
   reorder(projectIds: readonly string[]): void {
     projectRepo.setOrder(projectIds);
     events.emit({ type: 'dataReplaced' });
+  },
+
+  /** 提前毕业：从今天起不再出现，记录保留，并等待毕业典礼 */
+  graduateNow(projectId: string): boolean {
+    const project = projectRepo.getEntity(projectId);
+    if (!project || project.status === 'graduated') return false;
+    const today = clock.today();
+    getDatabase().withTransactionSync(() => {
+      const open = openPauseOf(project);
+      if (open) {
+        const plan = pausePlanOnGraduation(open, today);
+        if (plan.kind === 'discard') projectRepo.deleteOpenPause(projectId);
+        else projectRepo.closeOpenPause(projectId, plan.endDate);
+      }
+      projectRepo.setStatus(projectId, 'graduated', today);
+    });
+    events.emit({ type: 'projectChanged', projectId });
+    return true;
+  },
+
+  markGraduationSeen(projectId: string): void {
+    projectRepo.markGraduationSeen(projectId);
+    events.emit({ type: 'projectChanged', projectId });
+  },
+
+  unseenGraduations(): ProjectEntity[] {
+    return projectRepo.listEntities().filter((project) => project.status === 'graduated' && !project.graduationSeen);
   },
 
   /** 截止日期过完的项目自动毕业，返回本次毕业的项目 */

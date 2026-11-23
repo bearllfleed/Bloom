@@ -3,7 +3,7 @@
  * 开发版支持"时间旅行"：设定一个模拟时刻后，时间从该时刻继续流逝，并在重启后保留。
  * 内测版与正式版始终返回真实时间。
  */
-import { logicalDateOf, nextDayBoundary, type DayEndHour } from '@/domain/date';
+import { logicalDateOf, makeLocalDate, nextDayBoundary, type DayEndHour } from '@/domain/date';
 import type { LocalDate } from '@/domain/types';
 
 import { isDevToolsEnabled } from './appVariant';
@@ -22,9 +22,14 @@ function notify() {
 }
 
 export const clock = {
-  /** 当前时间戳（毫秒） */
+  /** 当前时间戳（毫秒）。时间旅行时是模拟时刻 */
   now(): number {
     return Date.now() + offsetMs;
+  },
+
+  /** 系统真实时间，不受时间旅行影响。排通知时用它和系统时钟比较 */
+  systemNow(): number {
+    return Date.now();
   },
 
   /** 逻辑今天（受"一天的结束时间"影响，见需求 5.2） */
@@ -35,6 +40,30 @@ export const clock = {
   /** 下一次逻辑日期翻篇的时间戳 */
   nextDayBoundary(): number {
     return nextDayBoundary(this.now(), dayEndHour);
+  },
+
+  /** 墙上时钟的日期和当天已过的分钟，用来判断提醒是不是已经过点 */
+  wallClock(): { date: LocalDate; minutes: number } {
+    const date = new Date(this.now());
+    return {
+      date: makeLocalDate(date.getFullYear(), date.getMonth() + 1, date.getDate()),
+      minutes: date.getHours() * 60 + date.getMinutes(),
+    };
+  },
+
+  /** 把本地日期和 HH:mm 换成时间戳（按设备时区） */
+  timestampAt(date: LocalDate, time: string): number {
+    const [year, month, day] = date.split('-').map(Number);
+    const [hour, minute] = time.split(':').map(Number);
+    return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
+  },
+
+  /**
+   * 通知要交给系统时钟。时间旅行时，把模拟时刻换算成真实时间戳，
+   * 这样"模拟的明天 8 点"会在真实时间走过同样间隔后响起。
+   */
+  toSystemTime(logicalMs: number): number {
+    return logicalMs - (this.now() - Date.now());
   },
 
   get dayEndHour(): DayEndHour {

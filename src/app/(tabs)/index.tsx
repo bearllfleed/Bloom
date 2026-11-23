@@ -2,12 +2,13 @@
  * 今日页（第 1 期 1-2）：顶栏 + 月/周日历 + 选中日期的项目列表。
  * 选中过去的日期打卡就是补卡，不弹任何提示；未来日期只能看不能打。
  */
-import { useEffect, useRef, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { addDays, formatMonthDayWeekday } from '@/domain/date';
+import type { CalendarMode } from '@/stores/prefsStore';
 import { listTitle } from '@/copy/today';
 import { useLiveQuery } from '@/features/common/useLiveQuery';
 import { Calendar } from '@/features/today/Calendar';
@@ -33,19 +34,32 @@ export default function TodayScreen() {
   const select = useTodayStore((s) => s.select);
   const backToToday = useTodayStore((s) => s.backToToday);
   const calendarMode = usePrefs((s) => s.calendarMode);
+  const calendarHome = usePrefs((s) => s.calendarHome);
   const weekStart = usePrefs((s) => s.weekStart);
+  const focusId = useTodayStore((s) => s.focusProjectId);
+  const focusToken = useTodayStore((s) => s.focusToken);
   const update = usePrefs((s) => s.update);
   const plantedId = usePlanted((s) => s.projectId);
   const clearPlanted = usePlanted((s) => s.clear);
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
 
-  const view = useLiveQuery(() => getDayView(selected), [selected]);
-  const todayView = useLiveQuery(() => getDayView(view.today), [view.today]);
+  const view = useLiveQuery(() => getDayView(selected), [selected, weekStart]);
+  const todayView = useLiveQuery(() => getDayView(view.today), [view.today, weekStart]);
   const bounds = useLiveQuery(getCalendarBounds, []);
 
   const noProjects = view.empty === 'noProjects';
-  const mode = noProjects ? 'week' : calendarMode;
+  const [sessionMode, setSessionMode] = useState<CalendarMode | null>(null);
+  const mode = noProjects ? 'week' : (sessionMode ?? (calendarHome === 'remember' ? calendarMode : calendarHome));
   const plantedVisible = plantedId !== null && view.items.some((i) => i.project.id === plantedId);
+
+  const offsets = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (!focusId) return;
+    const y = offsets.current[focusId];
+    if (y !== undefined) scroll.current?.scrollTo({ y: Math.max(0, y - 40), animated: true });
+    const timer = setTimeout(() => useTodayStore.getState().clearFocus(), 1400);
+    return () => clearTimeout(timer);
+  }, [focusId, focusToken, view.items]);
 
   useEffect(() => {
     if (!plantedVisible) return;
@@ -89,7 +103,10 @@ export default function TodayScreen() {
           weekStart={weekStart}
           jumpToken={jumpToken}
           onSelect={select}
-          onModeChange={(m) => update({ calendarMode: m })}
+          onModeChange={(m) => {
+            setSessionMode(m);
+            if (calendarHome === 'remember') update({ calendarMode: m });
+          }}
           onBackToToday={backToToday}
         />
         <Animated.View key={selected} entering={reduced ? undefined : FadeIn.duration(200)} style={styles.list}>
@@ -101,6 +118,9 @@ export default function TodayScreen() {
           {view.items.map((item, index) => (
             <Animated.View
               key={item.project.id}
+              onLayout={(event) => {
+                offsets.current[item.project.id] = event.nativeEvent.layout.y;
+              }}
               entering={
                 reduced
                   ? undefined
@@ -109,7 +129,12 @@ export default function TodayScreen() {
                     : FadeInDown.delay(Math.min(index, 6) * 40).duration(240)
               }
             >
-              <TodayCard item={item} date={selected} today={view.today} />
+              <TodayCard
+                item={item}
+                date={selected}
+                today={view.today}
+                pulseToken={focusId === item.project.id ? focusToken : 0}
+              />
             </Animated.View>
           ))}
           {view.empty ? <TodayEmpty reason={view.empty} isToday={selected === view.today} /> : null}

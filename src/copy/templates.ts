@@ -11,6 +11,8 @@ export interface ProjectTemplate {
   rule: FrequencyRule;
   unit: string;
   motto: string;
+  /** 模板自带的提醒时间，如早睡 22:30 */
+  reminderTimes?: readonly string[];
 }
 
 export const templates: readonly ProjectTemplate[] = [
@@ -22,6 +24,7 @@ export const templates: readonly ProjectTemplate[] = [
     rule: { kind: 'daily', timesPerDay: 1 },
     unit: '次',
     motto: '好好吃饭，好好睡觉',
+    reminderTimes: ['22:30'],
   },
   {
     id: 'water',

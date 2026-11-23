@@ -23,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: displayName,
   slug: 'bloom',
   scheme: 'bloom',
-  version: '0.1.0',
+  version: '0.2.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   icon: './assets/images/icon.png',
@@ -31,15 +31,55 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: BASE_ID + suffix,
-    buildNumber: '1',
+    buildNumber: '2',
     appleTeamId: '9849JR8DZU',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'Bloom Backup',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Owner',
+          LSItemContentTypes: ['com.bloom.habit.backup'],
+        },
+      ],
+      UTExportedTypeDeclarations: [
+        {
+          UTTypeIdentifier: 'com.bloom.habit.backup',
+          UTTypeDescription: 'Bloom backup',
+          UTTypeConformsTo: ['public.data', 'public.archive'],
+          UTTypeTagSpecification: {
+            'public.filename-extension': ['bloom'],
+            'public.mime-type': 'application/x-bloom-backup',
+          },
+        },
+      ],
     },
   },
   android: {
     package: BASE_ID + suffix,
-    versionCode: 1,
+    versionCode: 2,
+    permissions: [
+      'android.permission.INTERNET',
+      'android.permission.POST_NOTIFICATIONS',
+      'android.permission.RECEIVE_BOOT_COMPLETED',
+      'android.permission.VIBRATE',
+      'android.permission.SCHEDULE_EXACT_ALARM',
+      'android.permission.USE_EXACT_ALARM',
+    ],
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: false,
+        data: [
+          { scheme: 'content', mimeType: 'application/x-bloom-backup' },
+          { scheme: 'file', mimeType: 'application/x-bloom-backup' },
+          { scheme: 'content', pathPattern: '.*\\.bloom' },
+          { scheme: 'file', pathPattern: '.*\\.bloom' },
+        ],
+        category: ['DEFAULT', 'BROWSABLE'],
+      },
+    ],
     adaptiveIcon: {
       backgroundColor: '#FF8FB8',
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -52,6 +92,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-sqlite',
     'expo-font',
     'expo-sharing',
+    [
+      'expo-notifications',
+      {
+        color: '#FF8FB8',
+      },
+    ],
     'expo-localization',
     [
       'expo-splash-screen',

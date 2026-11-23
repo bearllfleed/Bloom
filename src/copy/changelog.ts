@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const changelog: readonly ChangelogEntry[] = [
   {
+    version: '0.2.0',
+    date: '2026-11-22',
+    items: [
+      '到点会提醒：每个项目最多 5 个时间，完成后或达标后可以不再响',
+      '统计页可以看到总览、某个月和一整年',
+      '坚持到期会有毕业典礼，也可以提前毕业、再来一轮',
+      '数据可以导出成备份文件，换手机时再导回来',
+    ],
+  },
+  {
     version: '0.1.0',
     date: '2026-11-22',
     items: [

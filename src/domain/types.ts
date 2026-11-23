@@ -68,6 +68,14 @@ export interface RuleSettings {
   weekStart: WeekStart;
 }
 
+/** 一个提醒时间点 */
+export interface ReminderSlot {
+  id: string;
+  /** HH:mm */
+  time: string;
+  enabled: boolean;
+}
+
 /** 项目的完整信息：规则引擎快照 + 界面需要的外观与设置 */
 export interface ProjectEntity extends ProjectSnapshot {
   name: string;
@@ -79,6 +87,14 @@ export interface ProjectEntity extends ProjectSnapshot {
   durationPreset: string | null;
   sortOrder: number;
   createdAt: number;
+  reminders: ReminderSlot[];
+  /** 当天完成后不再提醒 */
+  remindSkipDone: boolean;
+  /** 本周/本月达标后不再提醒 */
+  remindSkipPeriodMet: boolean;
+  /** 毕业典礼是否已经看过 */
+  graduationSeen: boolean;
+  previousProjectId: string | null;
 }
 
 export type CheckinSource = 'app' | 'widget' | 'notification';

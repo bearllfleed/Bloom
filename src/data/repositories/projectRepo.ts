@@ -7,7 +7,19 @@ import { clock } from '@/platform/clock';
 import { newId } from '@/utils/id';
 
 import { getDatabase } from '../db/client';
-import { toEntity, toSnapshot, type PauseRow, type ProjectRow, type ProjectRuleRow } from '../db/rows';
+import {
+  toEntity,
+  toSnapshot,
+  type PauseRow,
+  type ProjectRow,
+  type ProjectRuleRow,
+  type ReminderRow,
+} from '../db/rows';
+
+export interface ReminderDraft {
+  time: string;
+  enabled: boolean;
+}
 
 export interface NewProjectInput {
   name: string;
@@ -20,6 +32,10 @@ export interface NewProjectInput {
   durationPreset: string | null;
   noteEnabled: boolean;
   rule: FrequencyRule;
+  reminders?: ReminderDraft[];
+  remindSkipDone?: boolean;
+  remindSkipPeriodMet?: boolean;
+  previousProjectId?: string | null;
 }
 
 export interface ProjectInfoPatch {
@@ -51,8 +67,8 @@ export const projectRepo = {
       const maxOrder = db.getFirstSync<{ m: number | null }>('SELECT MAX(sort_order) AS m FROM projects')?.m ?? 0;
       db.runSync(
         `INSERT INTO projects (id, name, icon_id, color_id, motto, unit, start_date, end_date, duration_preset,
-           note_enabled, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           note_enabled, remind_skip_done, remind_skip_period_met, previous_project_id, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.name,
@@ -64,6 +80,9 @@ export const projectRepo = {
           input.endDate,
           input.durationPreset,
           input.noteEnabled ? 1 : 0,
+          input.remindSkipDone === false ? 0 : 1,
+          input.remindSkipPeriodMet === false ? 0 : 1,
+          input.previousProjectId ?? null,
           maxOrder + 1,
           now,
           now,
@@ -73,6 +92,15 @@ export const projectRepo = {
         'INSERT INTO project_rules (id, project_id, effective_from, rule_json, created_at) VALUES (?, ?, ?, ?, ?)',
         [newId(), id, input.startDate, JSON.stringify(input.rule), now],
       );
+      (input.reminders ?? []).forEach((slot, index) => {
+        db.runSync('INSERT INTO reminders (id, project_id, time, enabled, created_at) VALUES (?, ?, ?, ?, ?)', [
+          newId(),
+          id,
+          slot.time,
+          slot.enabled ? 1 : 0,
+          now + index,
+        ]);
+      });
     });
     return id;
   },
@@ -88,7 +116,8 @@ export const projectRepo = {
     const projects = this.listRows();
     const rules = groupBy(db.getAllSync<ProjectRuleRow>('SELECT * FROM project_rules'));
     const pauses = groupBy(db.getAllSync<PauseRow>('SELECT * FROM project_pauses'));
-    return projects.map((p) => toEntity(p, rules.get(p.id) ?? [], pauses.get(p.id) ?? []));
+    const reminders = groupBy(db.getAllSync<ReminderRow>('SELECT * FROM reminders'));
+    return projects.map((p) => toEntity(p, rules.get(p.id) ?? [], pauses.get(p.id) ?? [], reminders.get(p.id) ?? []));
   },
 
   getEntity(projectId: string): ProjectEntity | null {
@@ -99,7 +128,10 @@ export const projectRepo = {
     if (!project) return null;
     const rules = db.getAllSync<ProjectRuleRow>('SELECT * FROM project_rules WHERE project_id = ?', [projectId]);
     const pauses = db.getAllSync<PauseRow>('SELECT * FROM project_pauses WHERE project_id = ?', [projectId]);
-    return toEntity(project, rules, pauses);
+    const reminders = db.getAllSync<ReminderRow>('SELECT * FROM reminders WHERE project_id = ? ORDER BY created_at', [
+      projectId,
+    ]);
+    return toEntity(project, rules, pauses, reminders);
   },
 
   /** 规则引擎需要的项目快照 */
@@ -165,6 +197,32 @@ export const projectRepo = {
       'INSERT INTO project_rules (id, project_id, effective_from, rule_json, created_at) VALUES (?, ?, ?, ?, ?)',
       [newId(), projectId, effectiveFrom, JSON.stringify(rule), clock.now()],
     );
+  },
+
+  updateRemindFlags(projectId: string, skipDone: boolean, skipPeriodMet: boolean): void {
+    getDatabase().runSync(
+      'UPDATE projects SET remind_skip_done = ?, remind_skip_period_met = ?, updated_at = ? WHERE id = ?',
+      [skipDone ? 1 : 0, skipPeriodMet ? 1 : 0, clock.now(), projectId],
+    );
+  },
+
+  replaceReminders(projectId: string, reminders: readonly ReminderDraft[]): void {
+    const db = getDatabase();
+    const now = clock.now();
+    db.runSync('DELETE FROM reminders WHERE project_id = ?', [projectId]);
+    reminders.forEach((slot, index) => {
+      db.runSync('INSERT INTO reminders (id, project_id, time, enabled, created_at) VALUES (?, ?, ?, ?, ?)', [
+        newId(),
+        projectId,
+        slot.time,
+        slot.enabled ? 1 : 0,
+        now + index,
+      ]);
+    });
+  },
+
+  markGraduationSeen(projectId: string): void {
+    getDatabase().runSync('UPDATE projects SET graduation_seen = 1 WHERE id = ?', [projectId]);
   },
 
   setStatus(projectId: string, status: ProjectStatus, graduatedOn: LocalDate | null = null): void {

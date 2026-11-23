@@ -9,18 +9,21 @@ import { Icon, type UiIconName } from '@/ui/icons/Icon';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 import { inset } from '@/ui/tokens';
 
-import { AppText } from './AppText';
+import { AppText, type TextTone } from './AppText';
 
 export interface ListRowProps {
   icon?: UiIconName;
   label: string;
   value?: string;
+  valueTone?: TextTone;
   /** 右侧自定义内容（如开关），传入后不显示箭头 */
   right?: ReactNode;
   onPress?: () => void;
   disabled?: boolean;
   /** 行下方的辅助说明 */
   hint?: string;
+  hintTone?: TextTone;
+  onHintPress?: () => void;
   showDivider?: boolean;
 }
 
@@ -28,10 +31,13 @@ export function ListRow({
   icon,
   label,
   value,
+  valueTone = 'secondary',
   right,
   onPress,
   disabled = false,
   hint,
+  hintTone = 'link',
+  onHintPress,
   showDivider = false,
 }: ListRowProps) {
   const { colors } = useTheme();
@@ -45,14 +51,20 @@ export function ListRow({
           {label}
         </AppText>
         {value ? (
-          <AppText variant="callout" tone={disabled ? 'muted' : 'secondary'} numberOfLines={1} style={styles.value}>
+          <AppText variant="callout" tone={disabled ? 'muted' : valueTone} numberOfLines={1} style={styles.value}>
             {value}
           </AppText>
         ) : null}
         {right ?? (onPress ? <Icon name="chevron-right" size={18} color={colors.textMuted} /> : null)}
       </View>
       {hint ? (
-        <AppText variant="caption" tone="link" style={styles.hint}>
+        <AppText
+          variant="caption"
+          tone={hintTone}
+          style={styles.hint}
+          onPress={onHintPress}
+          accessibilityRole={onHintPress ? 'button' : undefined}
+        >
           {hint}
         </AppText>
       ) : null}

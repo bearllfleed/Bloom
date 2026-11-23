@@ -10,6 +10,7 @@ import type {
   ProjectRuleVersion,
   ProjectSnapshot,
   ProjectStatus,
+  ReminderSlot,
 } from '@/domain/types';
 
 export interface ProjectRow {
@@ -50,6 +51,14 @@ export interface PauseRow {
   end_date: string | null;
 }
 
+export interface ReminderRow {
+  id: string;
+  project_id: string;
+  time: string;
+  enabled: number;
+  created_at: number;
+}
+
 export interface CheckinRow {
   id: string;
   project_id: string;
@@ -80,7 +89,16 @@ export function toSnapshot(project: ProjectRow, rules: ProjectRuleRow[], pauses:
   };
 }
 
-export function toEntity(project: ProjectRow, rules: ProjectRuleRow[], pauses: PauseRow[]): ProjectEntity {
+export function toReminder(row: ReminderRow): ReminderSlot {
+  return { id: row.id, time: row.time, enabled: row.enabled === 1 };
+}
+
+export function toEntity(
+  project: ProjectRow,
+  rules: ProjectRuleRow[],
+  pauses: PauseRow[],
+  reminders: ReminderRow[] = [],
+): ProjectEntity {
   return {
     ...toSnapshot(project, rules, pauses),
     name: project.name,
@@ -92,6 +110,14 @@ export function toEntity(project: ProjectRow, rules: ProjectRuleRow[], pauses: P
     durationPreset: project.duration_preset,
     sortOrder: project.sort_order,
     createdAt: project.created_at,
+    reminders: reminders
+      .slice()
+      .sort((a, b) => a.created_at - b.created_at)
+      .map(toReminder),
+    remindSkipDone: project.remind_skip_done === 1,
+    remindSkipPeriodMet: project.remind_skip_period_met === 1,
+    graduationSeen: project.graduation_seen === 1,
+    previousProjectId: project.previous_project_id,
   };
 }
 

@@ -10,6 +10,7 @@ import { addMonths, formatMonthDayWeekday, formatYearMonth, startOfMonth, weekda
 import type { LocalDate, WeekStart } from '@/domain/types';
 import { useLiveQuery } from '@/features/common/useLiveQuery';
 import { getProjectMonth, getProjectMonthBounds } from '@/services/queries';
+import { projectMonthDone } from '@/services/statsQuery';
 import { AppText } from '@/ui/components/AppText';
 import { FlowerMark } from '@/ui/components/FlowerMark';
 import { Icon } from '@/ui/icons/Icon';
@@ -36,16 +37,19 @@ export function ProjectCalendar({
   today,
   weekStart,
   flowerColor,
+  unit,
 }: {
   projectId: string;
   today: LocalDate;
   weekStart: WeekStart;
   flowerColor: string;
+  unit: string;
 }) {
   const { colors } = useTheme();
   const [month, setMonth] = useState(startOfMonth(today));
   const bounds = useLiveQuery(() => getProjectMonthBounds(projectId), [projectId]);
   const weeks = useLiveQuery(() => getProjectMonth(projectId, month), [projectId, month, weekStart]);
+  const done = useLiveQuery(() => projectMonthDone(projectId, month), [projectId, month]);
   const canPrev = month > bounds.min;
   const canNext = month < bounds.max;
   const header = weekStart === 1 ? [1, 2, 3, 4, 5, 6, 7] : [7, 1, 2, 3, 4, 5, 6];
@@ -62,7 +66,9 @@ export function ProjectCalendar({
         >
           <Icon name="chevron-left" size={20} />
         </Pressable>
-        <AppText variant="title3">{formatYearMonth(month)}</AppText>
+        <AppText variant="title3">
+          {formatYearMonth(month)} · 本月完成 {done.value} {done.unit === 'times' ? unit : '天'}
+        </AppText>
         <Pressable
           accessibilityLabel="下个月"
           disabled={!canNext}

@@ -11,6 +11,8 @@ import { kv } from '@/platform/kv';
 
 export type Appearance = 'system' | 'light' | 'dark';
 export type CalendarMode = 'month' | 'week';
+export type CalendarHome = 'remember' | CalendarMode;
+export type BackupEvery = 0 | 7 | 14 | 30;
 
 export interface Prefs {
   nickname: string;
@@ -25,6 +27,13 @@ export interface Prefs {
   dayEndHour: DayEndHour;
   haptics: boolean;
   sound: boolean;
+  /** 首页日历：记住上次，或固定月/周 */
+  calendarHome: CalendarHome;
+  /** 晚间汇总，默认关 */
+  eveningSummary: boolean;
+  eveningSummaryTime: string;
+  /** 备份提醒间隔，0 为从不 */
+  backupEveryDays: BackupEvery;
   /** 仅开发版：在组件陈列页模拟系统"减弱动态效果" */
   devReduceMotion: boolean;
 }
@@ -39,6 +48,10 @@ const DEFAULTS: Prefs = {
   dayEndHour: 0,
   haptics: true,
   sound: false,
+  calendarHome: 'remember',
+  eveningSummary: false,
+  eveningSummaryTime: '21:30',
+  backupEveryDays: 30,
   devReduceMotion: false,
 };
 

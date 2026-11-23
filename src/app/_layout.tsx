@@ -4,7 +4,8 @@
  * 启动失败时展示"数据升级没有成功"，可导出诊断日志。
  */
 import { Fredoka_500Medium, Fredoka_600SemiBold, useFonts } from '@expo-google-fonts/fredoka';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -12,12 +13,18 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { bootCopy, trustCopy } from '@/copy/common';
+import { presentPendingGraduations } from '@/features/graduation/present';
 import { openChangelog } from '@/features/settings/ChangelogSheet';
 import { isDevToolsEnabled } from '@/platform/appVariant';
 import { clock } from '@/platform/clock';
 import { shareDiagnostics } from '@/platform/diagnostics';
+import { files } from '@/platform/files';
+import { notifications } from '@/platform/notifications';
+import { backupErrorText, parseBackup, stageBackup } from '@/services/backupService';
 import { markChangelogSeen, pendingChangelog } from '@/services/changelogService';
+import { events } from '@/services/events';
 import { bootstrap, onBackground, onForeground, type BootResult } from '@/services/lifecycleService';
+import { overlay } from '@/stores/overlayQueue';
 import { usePrefs } from '@/stores/prefsStore';
 import { useTodayStore } from '@/stores/todayStore';
 import { AppText } from '@/ui/components/AppText';
@@ -96,17 +103,46 @@ const formScreenOptions = {
 
 function RootNavigator() {
   const { colors, scheme } = useTheme();
+  const router = useRouter();
   const onboarded = usePrefs((s) => s.onboarded);
+  const url = Linking.useURL();
   useLifecycle();
 
   useEffect(() => {
+    void notifications.prepare();
+    return notifications.onResponse((data) => {
+      const projectId = typeof data.projectId === 'string' ? data.projectId : null;
+      useTodayStore.getState().focusOn(projectId);
+      router.navigate('/');
+    });
+  }, [router]);
+
+  useEffect(() => {
     if (!onboarded) return;
+    presentPendingGraduations();
+    const stop = events.subscribe(() => presentPendingGraduations());
     const entry = pendingChangelog();
-    if (entry) {
-      const timer = setTimeout(() => openChangelog(entry, markChangelogSeen), 600);
-      return () => clearTimeout(timer);
-    }
+    const timer = entry ? setTimeout(() => openChangelog(entry, markChangelogSeen), 600) : null;
+    return () => {
+      stop();
+      if (timer) clearTimeout(timer);
+    };
   }, [onboarded]);
+
+  useEffect(() => {
+    if (!url || !decodeURIComponent(url).includes('.bloom')) return;
+    try {
+      const parsed = parseBackup(files.adopt(url));
+      if (!parsed.ok) {
+        overlay.toast(backupErrorText(parsed.error));
+        return;
+      }
+      stageBackup(parsed.parsed);
+      router.push('/settings/import');
+    } catch {
+      overlay.toast(backupErrorText('corrupt'));
+    }
+  }, [router, url]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -118,7 +154,12 @@ function RootNavigator() {
         <Stack.Screen name="project/[id]/index" />
         <Stack.Screen name="project/[id]/edit" options={formScreenOptions} />
         <Stack.Screen name="history" />
+        <Stack.Screen name="project/[id]/review" />
         <Stack.Screen name="settings/about" />
+        <Stack.Screen name="settings/reminders" />
+        <Stack.Screen name="settings/backup" />
+        <Stack.Screen name="settings/import" />
+        <Stack.Screen name="settings/preferences" />
         {isDevToolsEnabled ? <Stack.Screen name="dev" /> : null}
       </Stack>
       <OverlayHost />

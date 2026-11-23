@@ -12,8 +12,14 @@ interface TodayState {
   followsToday: boolean;
   /** 日历要跳转到的日期，每次赋值都会让日历滚动过去 */
   jumpToken: number;
+  /** 通知点进来要轻弹的项目 */
+  focusProjectId: string | null;
+  focusToken: number;
   select: (date: LocalDate) => void;
   backToToday: () => void;
+  /** 打开今日页并定位到某个项目；空则只回到今天 */
+  focusOn: (projectId: string | null) => void;
+  clearFocus: () => void;
   /** 回到前台、时间旅行后调用 */
   syncWithClock: () => void;
 }
@@ -22,8 +28,19 @@ export const useTodayStore = create<TodayState>((set, get) => ({
   selectedDate: clock.today(),
   followsToday: true,
   jumpToken: 0,
+  focusProjectId: null,
+  focusToken: 0,
   select: (date) => set({ selectedDate: date, followsToday: date === clock.today() }),
   backToToday: () => set((s) => ({ selectedDate: clock.today(), followsToday: true, jumpToken: s.jumpToken + 1 })),
+  focusOn: (projectId) =>
+    set((s) => ({
+      selectedDate: clock.today(),
+      followsToday: true,
+      jumpToken: s.jumpToken + 1,
+      focusProjectId: projectId,
+      focusToken: s.focusToken + 1,
+    })),
+  clearFocus: () => set({ focusProjectId: null }),
   syncWithClock: () => {
     const today = clock.today();
     if (get().followsToday && get().selectedDate !== today) {
