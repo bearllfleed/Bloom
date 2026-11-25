@@ -11,6 +11,7 @@ import { clock } from '@/platform/clock';
 import { createLogger } from '@/platform/logger';
 import { applyPrefsOnLaunch } from '@/stores/prefsStore';
 
+import { achievementService } from './achievementService';
 import { backupService } from './backupService';
 import { events } from './events';
 import { projectService } from './projectService';
@@ -32,6 +33,8 @@ export function bootstrap(): BootResult {
     return booted;
   }
   getDatabase().runSync("INSERT OR IGNORE INTO meta (key, value) VALUES ('first_use_date', ?)", [clock.today()]);
+  // 先于自动毕业启动：首次升级的基线补发在前，启动时毕业的徽章照常弹出
+  achievementService.start();
   projectService.purgeDeleted();
   projectService.autoGraduate();
   reminderService.start();

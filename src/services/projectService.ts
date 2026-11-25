@@ -15,6 +15,7 @@ import {
 import { ruleOn } from '@/domain/rule';
 import type { FrequencyRule, LocalDate, ProjectEntity } from '@/domain/types';
 import { getDatabase } from '@/data/db/client';
+import { achievementRepo } from '@/data/repositories/achievementRepo';
 import { checkinRepo } from '@/data/repositories/checkinRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
 import { clock } from '@/platform/clock';
@@ -152,6 +153,8 @@ export const projectService = {
         else projectRepo.closeOpenPause(projectId, plan.endDate);
       }
       projectRepo.setStatus(projectId, 'active');
+      // "休息好啦"：和状态一起写，发事件时成就结算能读到
+      achievementRepo.recordPauseResume(clock.now());
     });
     events.emit({ type: 'projectChanged', projectId });
     return true;

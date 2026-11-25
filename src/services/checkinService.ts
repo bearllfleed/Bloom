@@ -5,6 +5,7 @@
 import { dayOverview } from '@/domain/stats';
 import { canCheckIn, isCompletingCheckIn, ruleOn, type CheckInBlockReason } from '@/domain/rule';
 import type { CheckinRecord, LocalDate } from '@/domain/types';
+import { achievementRepo } from '@/data/repositories/achievementRepo';
 import { checkinRepo } from '@/data/repositories/checkinRepo';
 import { metaRepo } from '@/data/repositories/metaRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
@@ -85,19 +86,29 @@ export const checkinService = {
   /** 撤销条：删掉刚才那一条 */
   undo(checkinId: string): CheckinRecord | null {
     const record = checkinRepo.deleteById(checkinId);
-    if (record) events.emit({ type: 'checkinChanged', projectId: record.projectId, date: record.date });
+    if (record) {
+      // 计数要在发事件之前写好，成就结算才能读到（"犹豫的小花"）
+      achievementRepo.recordUndo(clock.today(), clock.now());
+      events.emit({ type: 'checkinChanged', projectId: record.projectId, date: record.date });
+    }
     return record;
   },
 
   /** 已完成菜单里的"撤销一次"：删除该项目当天最近的一条 */
   undoLatest(projectId: string, date: LocalDate): CheckinRecord | null {
     const record = checkinRepo.deleteLatest(projectId, date);
-    if (record) events.emit({ type: 'checkinChanged', projectId, date });
+    if (record) {
+      achievementRepo.recordUndo(clock.today(), clock.now());
+      events.emit({ type: 'checkinChanged', projectId, date });
+    }
     return record;
   },
 
+  /** 打卡记录页里删除一条，不算撤销 */
   deleteRecord(checkinId: string): CheckinRecord | null {
-    return this.undo(checkinId);
+    const record = checkinRepo.deleteById(checkinId);
+    if (record) events.emit({ type: 'checkinChanged', projectId: record.projectId, date: record.date });
+    return record;
   },
 
   restoreRecord(record: CheckinRecord): void {

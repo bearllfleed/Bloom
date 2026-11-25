@@ -14,6 +14,7 @@ import { sha256Hex } from '@/data/backup/sha256';
 import { unzipStore, zipStore } from '@/data/backup/zipStore';
 import { getDatabase } from '@/data/db/client';
 import { currentVersion } from '@/data/db/migrator';
+import { achievementRepo } from '@/data/repositories/achievementRepo';
 import { checkinRepo } from '@/data/repositories/checkinRepo';
 import { metaRepo } from '@/data/repositories/metaRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
@@ -23,6 +24,7 @@ import { files, type StoredFile } from '@/platform/files';
 import { createLogger } from '@/platform/logger';
 import { usePrefs, type Prefs } from '@/stores/prefsStore';
 
+import { achievementService } from './achievementService';
 import { events } from './events';
 
 const log = createLogger('backup');
@@ -270,7 +272,11 @@ export const backupService = {
   },
 
   markExported(): void {
-    metaRepo.set(LAST_BACKUP, String(clock.now()));
+    const now = clock.now();
+    metaRepo.set(LAST_BACKUP, String(now));
+    // "有备无患"：导出没有数据事件，单独结算计数器
+    achievementRepo.recordBackupExport(now);
+    achievementService.settleCounters();
   },
 
   /** 导入前自动备份，失败则不允许继续恢复 */
@@ -328,6 +334,8 @@ export const backupService = {
     try {
       replaceAll(payload);
       usePrefs.getState().update({ ...payload.prefs });
+      // 先静默结算：导入后新满足条件的进补发卡，随后的事件结算就不会再逐个弹出
+      achievementService.settleSilently();
       events.emit({ type: 'dataReplaced' });
       staged = null;
       return { ok: true };
