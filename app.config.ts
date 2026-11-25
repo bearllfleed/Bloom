@@ -109,6 +109,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         dark: { image: './assets/images/splash-icon.png', backgroundColor: NIGHT },
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: '允许 Bloom 访问相册，给心情配上照片。',
+        cameraPermission: '允许 Bloom 使用相机，拍一张照片记下此刻的心情。',
+        microphonePermission: false,
+      },
+    ],
     ['expo-file-system', { enableFileSharing: true, supportsOpeningDocumentsInPlace: true }],
     [
       'expo-build-properties',
