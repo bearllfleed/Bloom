@@ -1,7 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M18 36h28l-4 19H22z" fill="#FFB088"/>
-  <path d="M26 40l1.5 11M32 40v11M38 40l-1.5 11"/>
-  <path d="M13 36c0-8 7-14 12.5-12 2-6.5 11-6.5 13 0C44 22 51 28 51 36z" fill="#FFC7DB"/>
-  <circle cx="32" cy="15" r="4" fill="#F2555A"/>
-  <path d="M21 30a6 6 0 0 1 4-3" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <path d="M18 35h28l-4 19H22z" fill="#C6A2FF" stroke="none"/>
+  <path d="M38 35h8l-4 19h-6z" fill="#A27BEA" stroke="none"/>
+  <path d="M18 35h28l-4 19H22z"/>
+  <path d="M26 39l1.5 11M32 39v11M38 39l-1.5 11" stroke-width="2"/>
+  <path d="M13 35c0-8 7-14 12.5-12 2-6.5 11-6.5 13 0C44 21 51 27 51 35z" fill="#FFC7DB" stroke="none"/>
+  <path d="M41.5 23.2C47 24 51 29 51 35H41c1.4-4 1.6-8 .5-11.8z" fill="#FFA3C3" stroke="none"/>
+  <path d="M13 35c0-8 7-14 12.5-12 2-6.5 11-6.5 13 0C44 21 51 27 51 35z"/>
+  <path d="M20.5 30a6 6 0 0 1 4-3" stroke="#FFFFFF" stroke-width="2.5"/>
+  <path d="M29 28.5l2-1M35.5 30l1.2 1.5" stroke="#FFD66B" stroke-width="2"/>
+  <path d="M25 32.5l1.8.6M43 29.5l.8-1.6" stroke="#8FD0FF" stroke-width="2"/>
+  <g data-part="cherry" data-origin="32 18">
+    <path d="M32 11c.4-2 1.8-3.6 4-4.3" stroke-width="2"/>
+    <circle cx="32" cy="15" r="4" fill="#F2555A" stroke-width="2.2"/>
+    <circle cx="30.6" cy="13.6" r="1" fill="#FFFFFF" stroke="none"/>
+  </g>
+  <g data-part="sparkle-a" data-origin="52 15">
+    <path d="M52 10.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
+  <g data-part="sparkle-b" data-origin="11 20">
+    <path d="M11 17c.4 1.9 1.1 2.6 3 3-1.9.4-2.6 1.1-3 3-.4-1.9-1.1-2.6-3-3 1.9-.4 2.6-1.1 3-3z" fill="#FFD66B" stroke-width="1.5"/>
+  </g>
 </svg>

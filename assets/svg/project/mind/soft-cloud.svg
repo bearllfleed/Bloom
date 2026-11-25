@@ -1,8 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M16 48c-6 0-10-4.5-10-10 0-5 4-9.5 9-9.5 1-7 7-12 14-12 6 0 11 3.5 13 9 1-.5 2.5-.5 3.5-.5 6 0 12 5 12 11.5S52.5 48 46.5 48z" fill="#E1F7F0"/>
-  <path d="M24 34q2 2 4 0M36 34q2 2 4 0"/>
-  <path d="M30 40q2 1.5 4 0"/>
-  <ellipse cx="21" cy="39" rx="2.6" ry="1.6" fill="#FFA3C3" stroke="none"/>
-  <ellipse cx="43" cy="39" rx="2.6" ry="1.6" fill="#FFA3C3" stroke="none"/>
-  <path d="M14 36a5 5 0 0 1 3-4" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <g data-part="cloud" data-origin="32 32">
+    <path d="M16 48c-6 0-10-4.5-10-10 0-5 4-9.5 9-9.5 1-7 7-12 14-12 6 0 11 3.5 13 9 1-.5 2.5-.5 3.5-.5 6 0 12 5 12 11.5S52.5 48 46.5 48z" fill="#E1F7F0" stroke="none"/>
+    <path d="M9.5 42.5C11 46 13.5 48 16 48h30.5c3 0 6.2-1.8 8.3-4.6C47 45.5 22 45.5 9.5 42.5z" fill="#7EDCC2" stroke="none"/>
+    <path d="M16 48c-6 0-10-4.5-10-10 0-5 4-9.5 9-9.5 1-7 7-12 14-12 6 0 11 3.5 13 9 1-.5 2.5-.5 3.5-.5 6 0 12 5 12 11.5S52.5 48 46.5 48z"/>
+    <path d="M13.5 35.5a5 5 0 0 1 3-4M24.5 22a10 10 0 0 1 5-2.8" stroke="#FFFFFF" stroke-width="2.5"/>
+    <path d="M24 34q2 2 4 0M36 34q2 2 4 0" stroke-width="2.2"/>
+    <path d="M30 39.5q2 1.5 4 0" stroke-width="2.2"/>
+    <ellipse cx="21" cy="39" rx="2.6" ry="1.6" fill="#FFA3C3" stroke="none"/>
+    <ellipse cx="43" cy="39" rx="2.6" ry="1.6" fill="#FFA3C3" stroke="none"/>
+  </g>
+  <g data-part="sparkle-a" data-origin="53 13">
+    <path d="M53 8.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
+  <g data-part="sparkle-b" data-origin="12 15">
+    <path d="M12 12c.4 1.9 1.1 2.6 3 3-1.9.4-2.6 1.1-3 3-.4-1.9-1.1-2.6-3-3 1.9-.4 2.6-1.1 3-3z" fill="#FFD66B" stroke-width="1.5"/>
+  </g>
 </svg>

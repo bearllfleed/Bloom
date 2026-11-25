@@ -87,6 +87,25 @@ export function walk(node: INode, visit: (n: INode) => void): void {
   node.children.forEach((child) => walk(child, visit));
 }
 
+export interface SvgPart {
+  name: string;
+  originX: number;
+  originY: number;
+}
+
+export const PART_NAME = /^[a-z][a-z0-9-]*$/;
+
+/** 读取 <g data-part="leaf" data-origin="32 40">；不是部件时返回 null，格式问题由 svg-lint 报告 */
+export function readPart(node: INode): SvgPart | null {
+  const name = node.attributes['data-part'];
+  if (name === undefined) return null;
+  const [originX, originY] = (node.attributes['data-origin'] ?? '')
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  return { name, originX, originY };
+}
+
 export interface ProjectManifest {
   categories: { id: string; name: string; color: string }[];
   icons: Record<string, { name: string; keywords: string[] }>;

@@ -1,8 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M21 9c-2 3 2 5 0 8M29 9c-2 3 2 5 0 8"/>
-  <path d="M40 27h4a5 5 0 0 1 0 10h-4"/>
-  <path d="M10 22h30v14a12 12 0 0 1-12 12h-6a12 12 0 0 1-12-12z" fill="#D8B79A"/>
-  <path d="M16 28v5" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
-  <circle cx="47" cy="47" r="10" fill="#F2555A"/>
-  <path d="M43 43l8 8M51 43l-8 8" stroke="#FFFFFF" stroke-width="3"/>
+  <g data-part="steam" data-origin="25.5 15">
+    <path d="M21 11c-2 3 2 5 0 8M30 11c-2 3 2 5 0 8" stroke="#B3A2AA"/>
+  </g>
+  <path d="M41 28h3a5.5 5.5 0 0 1 0 11h-3.5"/>
+  <path d="M11 24h30v12a13 13 0 0 1-13 13h-4A13 13 0 0 1 11 36z" fill="#A3ADFF" stroke="none"/>
+  <path d="M35 24h6v12a13 13 0 0 1-9.5 12.5C34 45 35 41 35 36z" fill="#7A86EE" stroke="none"/>
+  <path d="M11 24h30v3.5H11z" fill="#B99273" stroke="none"/>
+  <path d="M11 24h30v12a13 13 0 0 1-13 13h-4A13 13 0 0 1 11 36z"/>
+  <path d="M11 27.5h30" stroke-width="2"/>
+  <path d="M16 31v5" stroke="#FFFFFF" stroke-width="2.5"/>
+  <circle cx="16" cy="40" r="1.2" fill="#FFFFFF" stroke="none"/>
+  <g data-part="badge" data-origin="46 44">
+    <circle cx="46" cy="44" r="9" fill="#F2555A"/>
+    <path d="M42.5 40.5l7 7M49.5 40.5l-7 7" stroke="#FFFFFF" stroke-width="3"/>
+  </g>
+  <g data-part="sparkle-a" data-origin="52 14">
+    <path d="M52 9.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
 </svg>

@@ -1,6 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="32" cy="32" r="22" fill="#7A6470"/>
-  <path d="M19 26a14 14 0 0 1 7-7M45 38a14 14 0 0 1-7 7" stroke="#B3A2AA"/>
-  <circle cx="32" cy="32" r="8.5" fill="#C6A2FF"/>
-  <circle cx="32" cy="32" r="2.2" fill="#FFFFFF"/>
+  <circle cx="30" cy="35" r="20" fill="#7A6470"/>
+  <path d="M14 29.2A17 17 0 0 1 20.3 21.1" stroke="#FFFFFF" stroke-width="2.2" opacity="0.6"/>
+  <path d="M17.8 30.6A13 13 0 0 1 23.5 23.7M42.2 39.4A13 13 0 0 1 36.5 46.3" stroke="#B3A2AA" stroke-width="2"/>
+  <circle cx="30" cy="35" r="7.5" fill="#C6A2FF" stroke="none"/>
+  <path d="M30 27.5a7.5 7.5 0 0 1 0 15z" fill="#A27BEA" stroke="none"/>
+  <circle cx="30" cy="35" r="7.5" stroke-width="2"/>
+  <circle cx="30" cy="35" r="2" fill="#FFFFFF" stroke-width="1.5"/>
+  <g data-part="note-a" data-origin="52 14">
+    <path d="M52.5 19V8.5c1.6 1.6 3.4 2.2 5 2.6" stroke-width="2.2"/>
+    <ellipse cx="49.6" cy="19.2" rx="3.2" ry="2.5" transform="rotate(-20 49.6 19.2)" fill="#FFD66B" stroke-width="2"/>
+  </g>
+  <g data-part="sparkle-a" data-origin="12 12">
+    <path d="M12 7.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
 </svg>

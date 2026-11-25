@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePrefs } from '@/stores/prefsStore';
 import { TAB_BAR_HEIGHT, TabButton } from '@/ui/components/TabBar';
+import { focusGateLayout } from '@/ui/motion/idle';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 
 export default function TabsLayout() {
@@ -18,7 +19,7 @@ export default function TabsLayout() {
   const onboarded = usePrefs((s) => s.onboarded);
   if (!onboarded) return <Redirect href="/welcome" />;
   return (
-    <Tabs>
+    <Tabs options={{ screenLayout: focusGateLayout }}>
       <View style={[styles.body, { backgroundColor: colors.background }]}>
         <TabSlot />
       </View>

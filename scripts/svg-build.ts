@@ -1,7 +1,9 @@
 /**
  * SVG 资产生成（技术方案第 13 节）：assets/svg → src/ui/icons/generated。
  * - 界面图标：描边跟随 color 参数；class="accent" 的形状只在 active 时显示；
- * - 项目图标：支持贴纸外描边（outline）与灰度（mono），并生成带中文名和关键词的注册表。
+ * - 项目图标：支持贴纸外描边（outline）与灰度（mono），并生成带中文名和关键词的注册表；
+ *   <g data-part="leaf" data-origin="32 40"> 标出的部件交给 part 组件渲染（正常层和外描边层各一次），
+ *   待机动画替换 part 就能单独动叶子、星星，白边跟着一起动。
  * 运行前会先执行 svg-lint，不合规直接退出。
  */
 import { execFileSync } from 'node:child_process';
@@ -10,7 +12,7 @@ import path from 'node:path';
 import { optimize } from 'svgo';
 import { parseSync, type INode } from 'svgson';
 
-import { ROOT, loadAssets, loadProjectManifest, toGray, type SvgAsset } from './svgShared';
+import { ROOT, loadAssets, loadProjectManifest, readPart, toGray, walk, type SvgAsset } from './svgShared';
 
 const OUT_DIR = path.join(ROOT, 'src/ui/icons/generated');
 const HEADER = '/**\n * 此文件由 scripts/svg-build.ts 根据 assets/svg 生成，请勿手改。\n */\n';
@@ -71,7 +73,7 @@ function jsxAttrs(attrs: AttrMap): string {
 function convertAttrs(node: INode, map: (key: string, value: string) => string | null): AttrMap {
   const result: AttrMap = {};
   for (const [key, value] of Object.entries(node.attributes)) {
-    if (key === 'class' || key === 'xmlns') continue;
+    if (key === 'class' || key === 'xmlns' || key.startsWith('data-')) continue;
     const mapped = map(key, value);
     if (mapped !== null) result[camel(key)] = mapped;
   }
@@ -121,9 +123,22 @@ function buildUiIcon(asset: SvgAsset): { name: string; code: string } {
   return { name, code };
 }
 
+/** 可动部件：<g data-part> 包进 part 组件；分组自带的属性留在里层的 <G> 上 */
+function wrapPart(node: INode, attrs: AttrMap, children: string): string | null {
+  const part = readPart(node);
+  if (!part) return null;
+  const inner = Object.keys(attrs).length > 0 ? `<G ${jsxAttrs(attrs)}>${children}</G>` : children;
+  return `<P name=${JSON.stringify(part.name)} originX={${part.originX}} originY={${part.originY}}>${inner}</P>`;
+}
+
 /** 项目贴纸图标：正常层 + 可选的外描边层 */
-function buildProjectIcon(asset: SvgAsset): { name: string; code: string } {
+function buildProjectIcon(asset: SvgAsset): { name: string; code: string; parts: string[] } {
   const tree = optimizeSvg(asset.source);
+  const parts: string[] = [];
+  walk(tree, (node) => {
+    const part = readPart(node);
+    if (part) parts.push(part.name);
+  });
   const rootStrokeWidth = Number(tree.attributes['stroke-width'] ?? 2.5);
   const rootAttrs = convertAttrs(tree, (key, value) => {
     if (key === 'viewBox') return null;
@@ -141,7 +156,7 @@ function buildProjectIcon(asset: SvgAsset): { name: string; code: string } {
           }
           return value;
         });
-        return element(node.name, attrs, children);
+        return wrapPart(node, attrs, children) ?? element(node.name, attrs, children);
       }),
     )
     .join('');
@@ -150,7 +165,7 @@ function buildProjectIcon(asset: SvgAsset): { name: string; code: string } {
   const outline = tree.children
     .map((child) =>
       emitNode(child, (node, children) => {
-        if (node.name === 'g') return children ? `<G>${children}</G>` : null;
+        if (node.name === 'g') return children ? (wrapPart(node, {}, children) ?? `<G>${children}</G>`) : null;
         if (!TAGS[node.name] || node.attributes.stroke === 'none') return null;
         const hasFill = node.attributes.fill !== undefined && node.attributes.fill !== 'none';
         const width = Number(node.attributes['stroke-width'] ?? rootStrokeWidth) + OUTLINE_EXTRA_WIDTH;
@@ -168,7 +183,8 @@ function buildProjectIcon(asset: SvgAsset): { name: string; code: string } {
     .join('');
 
   const name = pascal(asset.id);
-  const code = `function ${name}({ size = 64, outline, mono = false }: ProjectIconProps) {
+  const partProp = parts.length > 0 ? ', part: P = StaticPart' : '';
+  const code = `function ${name}({ size = 64, outline, mono = false${partProp} }: ProjectIconProps) {
   return (
     <Svg width={size} height={size} viewBox="${tree.attributes.viewBox}">
       {outline ? (
@@ -178,7 +194,7 @@ function buildProjectIcon(asset: SvgAsset): { name: string; code: string } {
     </Svg>
   );
 }`;
-  return { name, code };
+  return { name, code, parts };
 }
 
 function svgImportLine(code: string): string {
@@ -226,7 +242,24 @@ function writeProjectIcons(assets: SvgAsset[]) {
       return `  { id: ${JSON.stringify(a.id)}, category: ${JSON.stringify(a.id.split('/')[0])}, name: ${JSON.stringify(meta.name)}, keywords: ${JSON.stringify(meta.keywords)} },`;
     })
     .join('\n');
-  const file = `${HEADER}${svgImportLine(body)}
+  const partsMap = assets.map((a, i) => `  ${JSON.stringify(a.id)}: ${JSON.stringify(built[i].parts)},`).join('\n');
+  const file = `${HEADER}import type { ComponentType, ReactNode } from 'react';
+${svgImportLine(body)}
+
+export interface IconPartProps {
+  /** data-part 的名字，如 leaf、star */
+  name: string;
+  /** 旋转、缩放中心（data-origin，画板坐标） */
+  originX: number;
+  originY: number;
+  children: ReactNode;
+}
+
+export type IconPartComponent = ComponentType<IconPartProps>;
+
+function StaticPart({ children }: IconPartProps) {
+  return <G>{children}</G>;
+}
 
 export interface ProjectIconProps {
   size?: number;
@@ -234,6 +267,8 @@ export interface ProjectIconProps {
   outline?: string;
   /** 灰度显示（暂停、禁用） */
   mono?: boolean;
+  /** 可动部件的渲染组件；不传时部件静止。正常层和外描边层各渲染一次 */
+  part?: IconPartComponent;
 }
 
 ${body}
@@ -243,6 +278,11 @@ ${map}
 } as const;
 
 export type ProjectIconId = keyof typeof projectIcons;
+
+/** 每个图标有哪些可动部件（按出现顺序） */
+export const projectIconParts: Record<ProjectIconId, readonly string[]> = {
+${partsMap}
+};
 
 export const projectIconCategories = ${JSON.stringify(manifest.categories, null, 2)} as const;
 

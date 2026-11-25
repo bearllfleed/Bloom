@@ -1,7 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M44 7L31 33" stroke="#B99273" stroke-width="4"/>
-  <path d="M44 7L31 33"/>
-  <path d="M24 31l14 6.5-4 18c-7 0-15-4.5-19-10.5z" fill="#FFD66B"/>
-  <path d="M21 44.5l9 4.5M25.5 38l10.5 5"/>
-  <path d="M27 34l6 3" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <path d="M45 7L32 32" stroke-width="6.5"/>
+  <path d="M45 7L32 32" stroke="#B99273" stroke-width="3.5"/>
+  <path d="M23 34l15 7-4 15c-7 0-15-4.5-19-10.5z" fill="#FFD66B" stroke="none"/>
+  <path d="M34 39.1l4 1.9-4 15c-1.5 0-3-.2-4.5-.5z" fill="#EBB53B" stroke="none"/>
+  <path d="M23 34l15 7-4 15c-7 0-15-4.5-19-10.5z"/>
+  <path d="M19 46l9 4.5M23.5 40l10.5 5" stroke-width="2"/>
+  <path d="M18.5 43l1.4 2" stroke="#FFFFFF" stroke-width="2"/>
+  <path d="M25 30l15 7-2 4-15-7z" fill="#A8DB7E" stroke="none"/>
+  <path d="M36.5 35.4l3.5 1.6-2 4-3.5-1.6z" fill="#7FBF52" stroke="none"/>
+  <path d="M25 30l15 7-2 4-15-7z"/>
+  <path d="M27.5 32.5l3.5 1.6" stroke="#FFFFFF" stroke-width="1.8"/>
+  <g data-part="cloud-dust" data-origin="45 51">
+    <circle cx="43" cy="53" r="2.6" fill="#F5EEF1" stroke="#B3A2AA" stroke-width="1.5"/>
+    <circle cx="47.5" cy="48.5" r="1.8" fill="#F5EEF1" stroke="#B3A2AA" stroke-width="1.5"/>
+  </g>
+  <g data-part="sparkle-a" data-origin="14 14">
+    <path d="M14 9.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
+  <g data-part="sparkle-b" data-origin="54 25">
+    <path d="M54 22c.4 1.9 1.1 2.6 3 3-1.9.4-2.6 1.1-3 3-.4-1.9-1.1-2.6-3-3 1.9-.4 2.6-1.1 3-3z" fill="#FFD66B" stroke-width="1.5"/>
+  </g>
 </svg>

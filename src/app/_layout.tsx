@@ -31,6 +31,7 @@ import { AppText } from '@/ui/components/AppText';
 import { CandyButton } from '@/ui/components/CandyButton';
 import { TimeTravelBanner } from '@/ui/components/TimeTravelBanner';
 import { Duoduo } from '@/ui/illustrations/Duoduo';
+import { focusGateLayout } from '@/ui/motion/idle';
 import { OverlayHost } from '@/ui/overlay/OverlayHost';
 import { ThemeProvider, useTheme } from '@/ui/theme/ThemeProvider';
 import { space } from '@/ui/tokens';
@@ -147,7 +148,10 @@ function RootNavigator() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <TimeTravelBanner />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+      <Stack
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+        screenLayout={focusGateLayout}
+      >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="welcome" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="project/new" options={formScreenOptions} />

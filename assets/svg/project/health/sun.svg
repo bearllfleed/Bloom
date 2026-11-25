@@ -1,5 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M32 7v7M32 50v7M7 32h7M50 32h7M14.3 14.3l5 5M44.7 44.7l5 5M14.3 49.7l5-5M44.7 19.3l5-5"/>
-  <circle cx="32" cy="32" r="13" fill="#FFD66B"/>
-  <path d="M25.5 29a7.5 7.5 0 0 1 4.5-4.5" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <g data-part="rays" data-origin="32 32">
+    <path d="M32 6v6M32 52v6M6 32h6M52 32h6M13.6 13.6l4.2 4.2M46.2 46.2l4.2 4.2M13.6 50.4l4.2-4.2M46.2 17.8l4.2-4.2" stroke-width="6.5"/>
+    <path d="M32 6v6M32 52v6M6 32h6M52 32h6M13.6 13.6l4.2 4.2M46.2 46.2l4.2 4.2M13.6 50.4l4.2-4.2M46.2 17.8l4.2-4.2" stroke="#FFD66B" stroke-width="3"/>
+  </g>
+  <circle cx="32" cy="32" r="13" fill="#FFD66B" stroke="none"/>
+  <path d="M41.2 22.8a13 13 0 0 1-18.4 18.4 15.5 15.5 0 0 0 18.4-18.4z" fill="#EBB53B" stroke="none"/>
+  <circle cx="32" cy="32" r="13"/>
+  <path d="M24.5 28.5a8 8 0 0 1 4-4.5" stroke="#FFFFFF" stroke-width="3"/>
+  <circle cx="23.8" cy="33.5" r="1.1" fill="#FFFFFF" stroke="none"/>
 </svg>

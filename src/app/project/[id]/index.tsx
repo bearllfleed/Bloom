@@ -125,7 +125,7 @@ export default function ProjectDetailScreen() {
       <DotPaper>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={[styles.head, { backgroundColor: color.base }]}>
-            <ProjectIcon id={project.iconId} size={64} sticker />
+            <ProjectIcon id={project.iconId} size={64} sticker idle />
             <View style={styles.headText}>
               <AppText variant="title2" color="#3F2A33" numberOfLines={1}>
                 {project.name}

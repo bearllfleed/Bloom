@@ -1,6 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M32 49c-3.5 4 3.5 6 0 10"/>
-  <path d="M29.5 46h5l-2.5 3.5z" fill="#FF8FB8"/>
-  <path d="M32 7c9.5 0 17 7.5 17 17 0 11.5-9.5 20.5-17 22.5-7.5-2-17-11-17-22.5 0-9.5 7.5-17 17-17z" fill="#FF8FB8"/>
-  <path d="M23 18a11 11 0 0 1 6-5" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <path d="M32 50c-3.5 3.5 3.5 5.5 0 9"/>
+  <g data-part="balloon" data-origin="32 49">
+    <path d="M32 7c9.5 0 17 7.5 17 17 0 11.5-9.5 20.5-17 22.5-7.5-2-17-11-17-22.5 0-9.5 7.5-17 17-17z" fill="#FF8FB8" stroke="none"/>
+    <path d="M38 8.2c6.5 2.3 11 8.6 11 15.8 0 11.5-9.5 20.5-17 22.5 8-6 12-23 6-38.3z" fill="#E8669A" stroke="none"/>
+    <path d="M25 33.5c2.5 3 6 4.5 10 4" stroke="#FFE6F0" stroke-width="1.6" opacity="0.7"/>
+    <path d="M32 7c9.5 0 17 7.5 17 17 0 11.5-9.5 20.5-17 22.5-7.5-2-17-11-17-22.5 0-9.5 7.5-17 17-17z"/>
+    <path d="M29 46.5h6l-3 3.5z" fill="#E8669A" stroke-width="2"/>
+    <path d="M21.5 19.5a11.5 11.5 0 0 1 6.5-7.5" stroke="#FFFFFF" stroke-width="3"/>
+    <circle cx="20.8" cy="25" r="1.4" fill="#FFFFFF" stroke="none"/>
+  </g>
+  <g data-part="sparkle-a" data-origin="11 12">
+    <path d="M11 7.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
+  <g data-part="sparkle-b" data-origin="52 45">
+    <path d="M52 42c.4 2 1 2.6 3 3-2 .4-2.6 1-3 3-.4-2-1-2.6-3-3 2-.4 2.6-1 3-3z" fill="#FFA3C3" stroke-width="1.6"/>
+  </g>
 </svg>

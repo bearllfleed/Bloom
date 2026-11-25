@@ -9,8 +9,10 @@ import {
   ASSET_SPECS,
   COLOR_ATTRS,
   FORBIDDEN_TAGS,
+  PART_NAME,
   loadAssets,
   loadProjectManifest,
+  readPart,
   walk,
   type AssetKind,
   type SvgAsset,
@@ -37,7 +39,23 @@ function lintAsset(asset: SvgAsset) {
     report(asset, '界面图标的描边必须写成 stroke="currentColor"，以支持深色模式');
   }
 
+  const partNames = new Set<string>();
+  const [, , width, height] = spec.viewBox.split(' ').map(Number);
   walk(root, (node) => {
+    const part = readPart(node);
+    if (part) {
+      if (asset.kind !== 'project') report(asset, '只有项目图标可以用 data-part 分层');
+      if (node.name !== 'g') report(asset, `data-part 只能写在 <g> 上（发现 <${node.name}>）`);
+      if (!PART_NAME.test(part.name)) report(asset, `data-part="${part.name}" 只能用小写字母、数字和短横线`);
+      if (partNames.has(part.name)) report(asset, `data-part="${part.name}" 重名`);
+      partNames.add(part.name);
+      const { originX: x, originY: y } = part;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > width || y > height) {
+        report(asset, `data-part="${part.name}" 需要画板内的 data-origin="x y"`);
+      }
+    } else if (node.attributes['data-origin'] !== undefined) {
+      report(asset, 'data-origin 必须和 data-part 一起用');
+    }
     if (FORBIDDEN_TAGS.has(node.name)) report(asset, `禁止使用 <${node.name}>`);
     if (node.attributes.style) report(asset, '禁止使用 style 属性，请改用独立属性');
     const href = node.attributes.href ?? node.attributes['xlink:href'];

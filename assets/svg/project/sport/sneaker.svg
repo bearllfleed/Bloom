@@ -1,6 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#3F2A33" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M8 43.5h47a4 4 0 0 1 0 8H12a4 4 0 0 1-4-4z" fill="#FFFFFF"/>
-  <path d="M10 43.5V28a4 4 0 0 1 4-4h7l7 7 10 2.5c8 2 14 5 16 10z" fill="#FFB088"/>
-  <path d="M25 31.5l3-3M30 33l3-3M35 34.5l2.5-2.5"/>
-  <path d="M14 37h12" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <g data-part="speed" data-origin="6 32.5">
+    <path d="M5 29.5h3M4 35.5h4" stroke="#B3A2AA"/>
+  </g>
+  <path d="M13 41V21a5 5 0 0 1 5-5h7l7 8 10 3c8 2.4 12 7 13 14z" fill="#FFB088" stroke="none"/>
+  <path d="M13 37h32v4H13z" fill="#EE8A5E" stroke="none"/>
+  <path d="M13 41V21a5 5 0 0 1 5-5h7l7 8 10 3c8 2.4 12 7 13 14z"/>
+  <path d="M47.27 29.22C51.81 31.85 54.25 35.75 55 41H45c-1-4-.7-8.6 2.27-11.78z" fill="#FFEDE2" stroke-width="2"/>
+  <path d="M29.5 27l3.5-3.7M34.5 28.5l3.5-3.7M39 30l3.5-3.7" stroke-width="2"/>
+  <path d="M19 32c4.5-1.4 9-1.2 13.5.6" stroke="#FFFFFF" stroke-width="2.2"/>
+  <path d="M17 21.5v5" stroke="#FFFFFF" stroke-width="2.5"/>
+  <path d="M11 41h44a4 4 0 0 1 0 8H15a4 4 0 0 1-4-4z" fill="#FFFFFF"/>
+  <path d="M14.5 45h41" stroke="#E9DFE3" stroke-width="1.6"/>
+  <g data-part="sparkle-a" data-origin="53 14">
+    <path d="M53 9.5c.6 2.9 1.6 3.9 4.5 4.5-2.9.6-3.9 1.6-4.5 4.5-.6-2.9-1.6-3.9-4.5-4.5 2.9-.6 3.9-1.6 4.5-4.5z" fill="#FFD66B" stroke-width="1.8"/>
+  </g>
 </svg>
