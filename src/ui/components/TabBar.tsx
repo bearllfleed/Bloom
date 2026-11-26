@@ -9,6 +9,7 @@ import type { TabTriggerSlotProps } from 'expo-router/ui';
 
 import { tabLabels } from '@/copy/common';
 import { haptics } from '@/platform/haptics';
+import { useNewBadges } from '@/stores/achievementSignals';
 import { AppText } from '@/ui/components/AppText';
 import { Icon, type UiIconName } from '@/ui/icons/Icon';
 import { springs } from '@/ui/motion';
@@ -32,6 +33,8 @@ export function TabButton({ tab, isFocused, onPressIn, ...props }: TabButtonProp
   const { colors } = useTheme();
   const scale = useSharedValue(1);
   const bounce = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  // 有还没看过的新徽章时，"成就"页签右上角显示莓果圆点（3-5）
+  const hasNew = useNewBadges((s) => s.ids.length > 0);
 
   return (
     <Pressable
@@ -60,6 +63,12 @@ export function TabButton({ tab, isFocused, onPressIn, ...props }: TabButtonProp
           accent={colors.accent}
           color={isFocused ? colors.link : colors.textMuted}
         />
+        {tab === 'achievements' && hasNew ? (
+          <View
+            accessibilityLabel="有新徽章"
+            style={[styles.badgeDot, { backgroundColor: colors.accent, borderColor: colors.card }]}
+          />
+        ) : null}
       </Animated.View>
       <AppText
         variant="micro"
@@ -100,4 +109,5 @@ const styles = StyleSheet.create({
   },
   item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
   focusedLabel: { fontWeight: '700' },
+  badgeDot: { position: 'absolute', right: -2, top: -2, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
 });

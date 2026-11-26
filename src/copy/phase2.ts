@@ -167,6 +167,7 @@ export const prefsCopy = {
 } as const;
 
 export const mePhaseCopy = {
+  moods: '心情手账',
   reminders: '提醒检查',
   backup: '备份与恢复',
   preferences: '偏好设置',

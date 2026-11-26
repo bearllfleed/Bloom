@@ -1,6 +1,6 @@
-/** 成就馆页签占位。 */
-import { PlaceholderScreen } from '@/features/today/PlaceholderScreen';
+/** 成就页签（第 3 期 3-5）：全部内容在 features/achievement/AchievementGallery。 */
+import { AchievementGallery } from '@/features/achievement/AchievementGallery';
 
 export default function AchievementsScreen() {
-  return <PlaceholderScreen />;
+  return <AchievementGallery />;
 }

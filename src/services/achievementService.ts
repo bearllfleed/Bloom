@@ -12,6 +12,7 @@ import {
   planSettle,
   type AchievementInput,
   type MetricGroup,
+  type Metrics,
   type SettlePlan,
 } from '@/domain/achievement';
 import { achievementRepo, type StoredUnlock } from '@/data/repositories/achievementRepo';
@@ -134,7 +135,12 @@ export const achievementService = {
     return achievementRepo.listUnlocks();
   },
 
-  /** 还没展示过的新徽章 */
+  /** 成就馆的进度条：当前各项指标的数值（只读，不改任何状态） */
+  progress(): Metrics {
+    return computeMetrics(loadInput(ALL_GROUPS), ALL_GROUPS);
+  },
+
+  /** 还没展示过的新徽章，按获得顺序 */
   unseen(): StoredUnlock[] {
     return achievementRepo.listUnlocks().filter((u) => !u.seen);
   },

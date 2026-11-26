@@ -14,6 +14,11 @@ import { AppText } from './AppText';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style' | 'maxLength'> {
   maxLength: number;
+  /**
+   * 原生输入框的上限，默认与 maxLength 相同。
+   * 需要由调用方截断并提示（如粘贴超长内容）时放宽，让 onChangeText 能拿到超长文本。
+   */
+  nativeMaxLength?: number;
   /** 从第几个字开始显示计数；默认达到上限的 75% */
   countFrom?: number;
   /** 错误提示；每次变为新的非空值时轻摇一次 */
@@ -23,6 +28,7 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style' | 'maxLengt
 
 export function TextField({
   maxLength,
+  nativeMaxLength,
   countFrom,
   error,
   large = false,
@@ -66,7 +72,7 @@ export function TextField({
         <TextInput
           {...rest}
           value={value}
-          maxLength={maxLength}
+          maxLength={nativeMaxLength ?? maxLength}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.accent}
           maxFontSizeMultiplier={1.3}

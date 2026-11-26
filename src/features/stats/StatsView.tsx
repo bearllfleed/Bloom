@@ -386,6 +386,9 @@ function YearPanel({ today, min }: { today: LocalDate; min: LocalDate }) {
           <StatTile label={statsCopy.graduated} value={stats.graduated} unit={statsCopy.unitCount} size="M" />
         </View>
       </StickerCard>
+      <StickerCard>
+        <StatTile label="获得徽章" value={stats.achievements} unit="枚" size="M" />
+      </StickerCard>
       <Ranking items={stats.ranking} />
       <StickerCard>
         <AppText variant="title3">{year} 的花园</AppText>

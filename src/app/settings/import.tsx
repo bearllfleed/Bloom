@@ -31,7 +31,7 @@ export default function ImportScreen() {
   const restore = () => {
     if (!parsed) return;
     setPhase('restoring');
-    const result = backupService.restore(parsed.payload);
+    const result = backupService.restore(parsed.payload, parsed.media);
     if (result.ok) setPhase('done');
     else {
       setMessage(backupErrorText(result.error));
@@ -54,6 +54,9 @@ export default function ImportScreen() {
                 <AppText variant="body">{backupCopy.counts(parsed.preview.projects, parsed.preview.checkins)}</AppText>
                 <AppText variant="caption" tone="secondary">
                   {backupCopy.moods(parsed.preview.moods, parsed.preview.photos)}
+                </AppText>
+                <AppText variant="caption" tone="secondary">
+                  {`徽章 ${parsed.preview.achievements} 枚`}
                 </AppText>
               </StickerCard>
               <AppText variant="callout" tone="secondary" align="center">

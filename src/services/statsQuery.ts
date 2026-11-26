@@ -21,6 +21,7 @@ import { displayStatusOf } from '@/domain/project';
 import { isDayCompleted, isRequiredKind, ruleOn, visibilityOn } from '@/domain/rule';
 import { completionRateOf, dayOverview, streakOf, type HeatLevel } from '@/domain/stats';
 import type { DailyCounts, LocalDate, ProjectEntity, ProjectSnapshot } from '@/domain/types';
+import { achievementRepo } from '@/data/repositories/achievementRepo';
 import { checkinRepo } from '@/data/repositories/checkinRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
 import { clock } from '@/platform/clock';
@@ -337,7 +338,16 @@ export function getYearStats(year: number) {
     }))
     .filter((item): item is RankItem => item.rate !== null)
     .sort((a, b) => b.rate - a.rate);
-  return { months, recordDays, total, perfect, graduated, ranking };
+  return {
+    months,
+    recordDays,
+    total,
+    perfect,
+    graduated,
+    achievements: achievementRepo.listUnlocks().filter((unlock) => new Date(unlock.unlockedAt).getFullYear() === year)
+      .length,
+    ranking,
+  };
 }
 
 export function statsBounds() {

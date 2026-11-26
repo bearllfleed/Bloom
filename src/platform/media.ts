@@ -121,6 +121,11 @@ export const media = {
     return new File(moodDir(), thumbFileName(fileName)).uri;
   },
 
+  /** 原图文件是否还在；草稿恢复前用它剔除已被清理的照片 */
+  exists(fileName: string): boolean {
+    return new File(moodDir(), fileName).exists;
+  },
+
   /** 删掉原图和缩略图；文件不在时不报错 */
   remove(fileName: string): void {
     for (const name of [fileName, thumbFileName(fileName)]) {

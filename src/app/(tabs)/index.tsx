@@ -1,16 +1,21 @@
 /**
  * 今日页（第 1 期 1-2）：顶栏 + 月/周日历 + 选中日期的项目列表。
  * 选中过去的日期打卡就是补卡，不弹任何提示；未来日期只能看不能打。
+ * 第 3 期 3-7：列表标题行右侧在完美日或已有当天心情时出现 20pt 小云朵。
  */
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { canShowDayMood } from '@/domain/achievement/presentation';
 import { addDays, formatMonthDayWeekday } from '@/domain/date';
 import type { CalendarMode } from '@/stores/prefsStore';
 import { listTitle } from '@/copy/today';
+import { moodCopy } from '@/copy/phase3';
 import { useLiveQuery } from '@/features/common/useLiveQuery';
+import { readMoodPath, writeMoodPath } from '@/features/mood/links';
 import { Calendar } from '@/features/today/Calendar';
 import { usePlanted } from '@/features/today/celebration';
 import { PerfectDayLayer } from '@/features/today/PerfectDay';
@@ -18,13 +23,37 @@ import { TodayCard } from '@/features/today/TodayCard';
 import { TodayEmpty } from '@/features/today/TodayEmpty';
 import { TodayHeader } from '@/features/today/TodayHeader';
 import { getCalendarBounds, getDayView } from '@/services/queries';
+import { moodService } from '@/services/moodService';
 import { usePrefs } from '@/stores/prefsStore';
 import { useTodayStore } from '@/stores/todayStore';
 import { AppText } from '@/ui/components/AppText';
 import { DotPaper } from '@/ui/components/DotPaper';
+import { Icon } from '@/ui/icons/Icon';
 import type { DuoduoMood } from '@/ui/illustrations/Duoduo';
 import { useMotionReduced } from '@/ui/motion';
+import { useTheme } from '@/ui/theme/ThemeProvider';
 import { inset, space } from '@/ui/tokens';
+
+/** 列表标题行右侧的当天心情入口：完美日或当天已有心情时才出现 */
+function DayMoodEntry({ date, today, perfect }: { date: string; today: string; perfect: boolean }) {
+  const router = useRouter();
+  const { colors } = useTheme();
+  // 当天任意一篇心情都算"已有当天心情"；当天整体心情存在时点开就是看它
+  const dayMoods = useLiveQuery(() => moodService.listForDate(date), [date]);
+  const dayMood = dayMoods.find((mood) => mood.projectId === null) ?? null;
+  const show = canShowDayMood({ perfect, hasMood: dayMoods.length > 0, future: date > today });
+  if (!show) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={dayMood ? moodCopy.dayRead : moodCopy.dayWrite}
+      hitSlop={12}
+      onPress={() => router.push(dayMood ? readMoodPath(dayMood.id) : writeMoodPath(date, null))}
+    >
+      <Icon name="cloud" size={20} color={colors.textMuted} />
+    </Pressable>
+  );
+}
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
@@ -111,9 +140,17 @@ export default function TodayScreen() {
         />
         <Animated.View key={selected} entering={reduced ? undefined : FadeIn.duration(200)} style={styles.list}>
           {view.items.length > 0 ? (
-            <AppText variant="callout" tone={view.overview.isPerfect ? 'link' : 'secondary'} style={styles.title}>
-              {title}
-            </AppText>
+            <View style={styles.titleRow}>
+              <AppText
+                variant="callout"
+                tone={view.overview.isPerfect ? 'link' : 'secondary'}
+                style={styles.title}
+                numberOfLines={1}
+              >
+                {title}
+              </AppText>
+              <DayMoodEntry date={selected} today={view.today} perfect={view.overview.isPerfect} />
+            </View>
           ) : null}
           {view.items.map((item, index) => (
             <Animated.View
@@ -149,5 +186,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingBottom: space.giant * 2 },
   list: { paddingHorizontal: inset.page, gap: inset.cardGap, marginTop: space.sm },
-  title: { marginLeft: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  title: { marginLeft: 4, flexShrink: 1 },
 });

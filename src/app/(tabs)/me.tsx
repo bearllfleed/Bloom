@@ -68,6 +68,7 @@ export default function MeScreen() {
 
         <StickerCard padding={0}>
           <ListRow icon="history" label={meCopy.history} onPress={() => router.push('/history')} />
+          <ListRow icon="note" label={mePhaseCopy.moods} onPress={() => router.push('/mood')} showDivider />
           <ListRow
             icon="bell"
             label={mePhaseCopy.reminders}

@@ -13,6 +13,7 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { bootCopy, trustCopy } from '@/copy/common';
+import { presentPendingUnlocks } from '@/features/achievement';
 import { presentPendingGraduations } from '@/features/graduation/present';
 import { openChangelog } from '@/features/settings/ChangelogSheet';
 import { isDevToolsEnabled } from '@/platform/appVariant';
@@ -24,6 +25,7 @@ import { backupErrorText, parseBackup, stageBackup } from '@/services/backupServ
 import { markChangelogSeen, pendingChangelog } from '@/services/changelogService';
 import { events } from '@/services/events';
 import { bootstrap, onBackground, onForeground, type BootResult } from '@/services/lifecycleService';
+import { achievementService } from '@/services/achievementService';
 import { overlay } from '@/stores/overlayQueue';
 import { usePrefs } from '@/stores/prefsStore';
 import { useTodayStore } from '@/stores/todayStore';
@@ -121,11 +123,15 @@ function RootNavigator() {
   useEffect(() => {
     if (!onboarded) return;
     presentPendingGraduations();
+    presentPendingUnlocks();
     const stop = events.subscribe(() => presentPendingGraduations());
+    // 新徽章停手 1.2 秒后才通知；启动时也要补弹上次没看完的
+    const stopUnlocks = achievementService.onUnlocked(() => presentPendingUnlocks());
     const entry = pendingChangelog();
     const timer = entry ? setTimeout(() => openChangelog(entry, markChangelogSeen), 600) : null;
     return () => {
       stop();
+      stopUnlocks();
       if (timer) clearTimeout(timer);
     };
   }, [onboarded]);
@@ -158,6 +164,9 @@ function RootNavigator() {
         <Stack.Screen name="project/[id]/index" />
         <Stack.Screen name="project/[id]/edit" options={formScreenOptions} />
         <Stack.Screen name="history" />
+        <Stack.Screen name="mood/index" />
+        <Stack.Screen name="mood/[id]" />
+        <Stack.Screen name="mood/editor" options={formScreenOptions} />
         <Stack.Screen name="project/[id]/review" />
         <Stack.Screen name="settings/about" />
         <Stack.Screen name="settings/reminders" />
