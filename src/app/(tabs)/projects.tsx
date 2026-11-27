@@ -37,7 +37,7 @@ export default function ProjectsScreen() {
   const reduced = useMotionReduced();
   const [group, setGroup] = useState<Group>('active');
   const [sorting, setSorting] = useState(false);
-  const groups = useLiveQuery(getProjectGroups, []);
+  const groups = useLiveQuery(getProjectGroups, [], ['projects', 'checkins', 'clock']);
   const list = groups[group];
   const canSort = group === 'active' && groups.active.filter((s) => s.status === 'active').length > 1;
 

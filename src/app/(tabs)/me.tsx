@@ -31,8 +31,8 @@ export default function MeScreen() {
   const { colors } = useTheme();
   const nickname = usePrefs((s) => s.nickname);
   const avatarId = usePrefs((s) => s.avatarId);
-  const days = useLiveQuery(companionDays, []);
-  const backup = useLiveQuery(() => backupService.status(), []);
+  const days = useLiveQuery(companionDays, [], ['clock']);
+  const backup = useLiveQuery(() => backupService.status(), [], ['backup', 'clock']);
   const [reminderProblem, setReminderProblem] = useState(false);
   useEffect(() => {
     void notifications.permission().then((state) => setReminderProblem(state !== 'granted'));
@@ -68,6 +68,7 @@ export default function MeScreen() {
 
         <StickerCard padding={0}>
           <ListRow icon="history" label={meCopy.history} onPress={() => router.push('/history')} />
+          <ListRow icon="note" label={mePhaseCopy.moods} onPress={() => router.push('/mood')} showDivider />
           <ListRow
             icon="bell"
             label={mePhaseCopy.reminders}

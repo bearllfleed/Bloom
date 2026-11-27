@@ -1,7 +1,9 @@
 /**
  * 完美日庆祝（M05）：24 片花瓣从屏幕上方左右摇摆飘落，顶部滑下横幅"今天的花全开啦"。
  * 横幅 4 秒后自动收起，点一下或上滑可提前关闭。减弱动态时只显示横幅。
+ * 第 3 期 3-7：横幅上的"记下心情"跳到当天整体心情编辑页，不自动弹出编辑页。
  */
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -19,8 +21,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { moodCopy } from '@/copy/phase3';
 import { todayCopy } from '@/copy/today';
+import { writeMoodPath } from '@/features/mood/links';
 import { haptics } from '@/platform/haptics';
+import { clock } from '@/platform/clock';
 import { AppText } from '@/ui/components/AppText';
 import { FlowerGlyph } from '@/ui/components/FlowerMark';
 import { useMotionReduced } from '@/ui/motion';
@@ -80,6 +85,7 @@ function Petal({ index, width, height }: { index: number; width: number; height:
 }
 
 function Banner({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const pan = usePanGesture({
@@ -89,6 +95,11 @@ function Banner({ onClose }: { onClose: () => void }) {
       if (e.translationY < -16) scheduleOnRN(onClose);
     },
   });
+  const writeMood = () => {
+    haptics.light();
+    onClose();
+    router.push(writeMoodPath(clock.today(), null));
+  };
   return (
     <GestureDetector gesture={pan}>
       <Animated.View
@@ -96,12 +107,19 @@ function Banner({ onClose }: { onClose: () => void }) {
         exiting={SlideOutUp.duration(200)}
         style={[styles.banner, { top: insets.top + 8, backgroundColor: colors.card, shadowColor: colors.shadow }]}
       >
-        <Pressable accessibilityRole="button" onPress={onClose} style={styles.bannerInner}>
-          <FlowerGlyph size={28} petal={colors.accent} outlined />
-          <AppText variant="title3" tone="link">
-            {todayCopy.perfectBanner}
-          </AppText>
-        </Pressable>
+        <View style={styles.bannerInner}>
+          <Pressable accessibilityRole="button" onPress={onClose} style={styles.bannerMain}>
+            <FlowerGlyph size={28} petal={colors.accent} outlined />
+            <AppText variant="title3" tone="link" numberOfLines={1} style={styles.bannerText}>
+              {todayCopy.perfectBanner}
+            </AppText>
+          </Pressable>
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={writeMood}>
+            <AppText variant="callout" tone="secondary">
+              {moodCopy.remember}
+            </AppText>
+          </Pressable>
+        </View>
       </Animated.View>
     </GestureDetector>
   );
@@ -156,4 +174,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   bannerInner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16 },
+  bannerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bannerText: { flexShrink: 1 },
 });

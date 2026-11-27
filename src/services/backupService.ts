@@ -1,7 +1,7 @@
 /**
  * 备份与恢复（技术方案第 12 节）。
- * .bloom 是不压缩的 zip：manifest.json + data.json。照片字段先留空，等心情上线再写入。
- * 导入前先做一份自动快照；写入放在一个事务里，失败则原数据不动。
+ * .bloom 是不压缩的 zip：manifest.json + data.json + media/mood 原图与缩略图。
+ * 导入前校验每个照片哈希并做自动快照；数据库与媒体目录分阶段替换，失败保留原数据。
  */
 import { Platform } from 'react-native';
 
@@ -10,6 +10,8 @@ import { describeRule } from '@/domain/project';
 import { ruleOn } from '@/domain/rule';
 import { completionRateOf, totalCompletedOf } from '@/domain/stats';
 import type { FrequencyRule, ProjectStatus } from '@/domain/types';
+import { BLOOM_BACKUP_FORMAT_VERSION, encodeBloomBackup, type BackupPayload } from '@/data/backup';
+import { moodMediaEntries, verifyMoodMedia } from '@/data/backup/media';
 import { sha256Hex } from '@/data/backup/sha256';
 import { unzipStore, zipStore } from '@/data/backup/zipStore';
 import { getDatabase } from '@/data/db/client';
@@ -23,12 +25,12 @@ import { clock } from '@/platform/clock';
 import { files, type StoredFile } from '@/platform/files';
 import { createLogger } from '@/platform/logger';
 import { usePrefs, type Prefs } from '@/stores/prefsStore';
+import { newId } from '@/utils/id';
 
 import { achievementService } from './achievementService';
 import { events } from './events';
 
 const log = createLogger('backup');
-const FORMAT_VERSION = 1;
 const LAST_BACKUP = 'last_backup_at';
 
 export type BackupError = 'notBackup' | 'corrupt' | 'tooNew' | 'space';
@@ -40,26 +42,16 @@ export interface BackupPreview {
   checkins: number;
   moods: number;
   photos: number;
+  achievements: number;
 }
 
-interface Payload {
-  formatVersion: number;
-  prefs: Prefs;
-  projects: Record<string, unknown>[];
-  rules: Record<string, unknown>[];
-  pauses: Record<string, unknown>[];
-  reminders: Record<string, unknown>[];
-  checkins: Record<string, unknown>[];
-  moods: Record<string, unknown>[];
-  moodPhotos: Record<string, unknown>[];
-  achievements: Record<string, unknown>[];
-  counters: Record<string, unknown>[];
-  meta: Record<string, unknown>[];
-}
+type Payload = BackupPayload<Prefs>;
 
 export interface ParsedBackup {
   preview: BackupPreview;
   payload: Payload;
+  /** 仅 ZIP 内的照片，导入成功前不会写入文档目录 */
+  media: { name: string; data: Uint8Array }[];
 }
 
 const text = new TextEncoder();
@@ -87,7 +79,7 @@ function rows(sql: string): Record<string, unknown>[] {
 function buildPayload(): Payload {
   const { update: _update, ...prefs } = usePrefs.getState();
   return {
-    formatVersion: FORMAT_VERSION,
+    formatVersion: BLOOM_BACKUP_FORMAT_VERSION,
     prefs,
     projects: rows('SELECT * FROM projects'),
     rules: rows('SELECT * FROM project_rules'),
@@ -103,27 +95,17 @@ function buildPayload(): Payload {
 }
 
 function pack(payload: Payload, prefix: string): StoredFile {
-  const data = text.encode(JSON.stringify(payload));
-  const manifest = {
-    format: 'bloom-backup',
-    formatVersion: FORMAT_VERSION,
-    schemaVersion: currentVersion(getDatabase()),
-    appVersion,
-    exportedAt: isoLocal(clock.now()),
-    platform: Platform.OS,
-    counts: {
-      projects: payload.projects.filter((row) => row.deleted_at == null).length,
-      checkins: payload.checkins.length,
-      moods: payload.moods.length,
-      photos: payload.moodPhotos.length,
-      achievements: payload.achievements.length,
+  const media = moodMediaEntries(payload.moodPhotos, files.readMoodPhoto);
+  const { bytes } = encodeBloomBackup(
+    payload,
+    {
+      schemaVersion: currentVersion(getDatabase()),
+      appVersion,
+      exportedAt: isoLocal(clock.now()),
+      platform: Platform.OS,
     },
-    sha256: sha256Hex(data),
-  };
-  const bytes = zipStore([
-    { name: 'manifest.json', data: text.encode(JSON.stringify(manifest)) },
-    { name: 'data.json', data },
-  ]);
+    media,
+  );
   const name = `${prefix}${stamp(clock.now())}.bloom`;
   return files.write(name, bytes);
 }
@@ -146,19 +128,29 @@ export function parseBackup(uri: string): { ok: true; parsed: ParsedBackup } | {
       formatVersion?: number;
       exportedAt?: string;
       platform?: string;
-      counts?: { projects?: number; checkins?: number; moods?: number; photos?: number };
+      counts?: { projects?: number; checkins?: number; moods?: number; photos?: number; achievements?: number };
       sha256?: string;
+      mediaSha256?: Record<string, string>;
     };
     if (manifest.format !== 'bloom-backup') return { ok: false, error: 'notBackup' };
-    if ((manifest.formatVersion ?? 0) > FORMAT_VERSION) return { ok: false, error: 'tooNew' };
+    if ((manifest.formatVersion ?? 0) > BLOOM_BACKUP_FORMAT_VERSION) return { ok: false, error: 'tooNew' };
     if (manifest.sha256 !== sha256Hex(dataBytes)) return { ok: false, error: 'corrupt' };
     const payload = JSON.parse(decoder.decode(dataBytes)) as Payload;
-    if (!payload || payload.formatVersion !== 1 || !Array.isArray(payload.projects))
+    if (!payload || payload.formatVersion !== BLOOM_BACKUP_FORMAT_VERSION || !Array.isArray(payload.projects))
       return { ok: false, error: 'corrupt' };
+    const media = [...unzipped.entries()]
+      .filter(([name]) => name.startsWith('media/mood/'))
+      .map(([name, data]) => ({ name, data }));
+    const mediaError = verifyMoodMedia(payload.moodPhotos ?? [], media, manifest.mediaSha256 ?? {});
+    if (mediaError) {
+      log.warn('备份照片校验失败', mediaError);
+      return { ok: false, error: 'corrupt' };
+    }
     return {
       ok: true,
       parsed: {
         payload,
+        media,
         preview: {
           exportedAt: manifest.exportedAt ?? '',
           platform: manifest.platform ?? '',
@@ -166,6 +158,7 @@ export function parseBackup(uri: string): { ok: true; parsed: ParsedBackup } | {
           checkins: manifest.counts?.checkins ?? payload.checkins.length,
           moods: manifest.counts?.moods ?? 0,
           photos: manifest.counts?.photos ?? 0,
+          achievements: manifest.counts?.achievements ?? payload.achievements?.length ?? 0,
         },
       },
     };
@@ -277,12 +270,14 @@ export const backupService = {
     // "有备无患"：导出没有数据事件，单独结算计数器
     achievementRepo.recordBackupExport(now);
     achievementService.settleCounters();
+    events.emit({ type: 'backupChanged' });
   },
 
   /** 导入前自动备份，失败则不允许继续恢复 */
   snapshotBeforeImport(): StoredFile {
     const file = pack(buildPayload(), '导入前自动备份_');
     prune('导入前自动备份_', 8);
+    events.emit({ type: 'backupChanged' });
     return file;
   },
 
@@ -296,6 +291,7 @@ export const backupService = {
       }
       pack(buildPayload(), '自动快照_');
       prune('自动快照_', 4);
+      events.emit({ type: 'backupChanged' });
     } catch (error) {
       log.warn('自动快照失败', error);
     }
@@ -325,14 +321,22 @@ export const backupService = {
     return { daysAgo, due, label };
   },
 
-  restore(payload: Payload): { ok: true } | { ok: false; error: BackupError } {
+  restore(
+    payload: Payload,
+    media: readonly { name: string; data: Uint8Array }[] = [],
+  ): { ok: true } | { ok: false; error: BackupError } {
     try {
       this.snapshotBeforeImport();
     } catch (error) {
       return { ok: false, error: asError(error) };
     }
+    const restoreId = newId();
     try {
+      for (const entry of media) {
+        files.writeMoodPhotoStaging(restoreId, entry.name.slice('media/mood/'.length), entry.data);
+      }
       replaceAll(payload);
+      files.commitMoodPhotoStaging(restoreId);
       usePrefs.getState().update({ ...payload.prefs });
       // 先静默结算：导入后新满足条件的进补发卡，随后的事件结算就不会再逐个弹出
       achievementService.settleSilently();
@@ -340,6 +344,7 @@ export const backupService = {
       staged = null;
       return { ok: true };
     } catch (error) {
+      files.removeMoodPhotoStaging(restoreId);
       log.warn('恢复失败', error);
       return { ok: false, error: asError(error) };
     }

@@ -1,12 +1,12 @@
 /**
  * 分段控件（设计规范第 8 节）：弱底胶囊，选中滑块为白色带厚边，在选项间用弹簧滑动。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { haptics } from '@/platform/haptics';
-import { springs } from '@/ui/motion';
+import { springs, useMotionReduced } from '@/ui/motion';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 
 import { AppText } from './AppText';
@@ -27,16 +27,23 @@ const PAD = 3;
 
 export function SegmentedControl<T extends string>({ options, value, onChange }: SegmentedControlProps<T>) {
   const { colors } = useTheme();
+  const reduced = useMotionReduced();
   const [width, setWidth] = useState(0);
   const index = Math.max(
     0,
     options.findIndex((o) => o.value === value),
   );
   const segment = width > 0 ? (width - PAD * 2) / options.length : 0;
+  const translateX = useSharedValue(0);
+
+  useEffect(() => {
+    const target = index * segment;
+    cancelAnimation(translateX);
+    translateX.value = reduced ? target : withSpring(target, springs.gentle);
+  }, [index, reduced, segment, translateX]);
 
   const thumb = useAnimatedStyle(() => ({
-    width: segment,
-    transform: [{ translateX: withSpring(index * segment, springs.gentle) }],
+    transform: [{ translateX: translateX.value }],
   }));
 
   return (
@@ -47,7 +54,11 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
     >
       {width > 0 ? (
         <Animated.View
-          style={[styles.thumb, { backgroundColor: colors.card, borderBottomColor: colors.cardEdge }, thumb]}
+          style={[
+            styles.thumb,
+            { width: segment, backgroundColor: colors.card, borderBottomColor: colors.cardEdge },
+            thumb,
+          ]}
         />
       ) : null}
       {options.map((option) => {

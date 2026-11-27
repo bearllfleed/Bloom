@@ -2,6 +2,7 @@
  * 打卡记录（第 1 期 1-7）：项目筛选芯片 + 按月分段（月份标题吸顶）。
  * 按归属日期倒序、同一天按实际时间倒序；首次加载最近 3 个月，滚到底再加载。
  * 左滑删除（5 秒撤销）；点一行打开记录详情。
+ * 第 3 期 3-10：有心情的记录行右侧出现迷你表情，点击进入心情详情。
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -9,11 +10,17 @@ import { Pressable, ScrollView, SectionList, StyleSheet, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatYearMonth, weekdayLabel } from '@/domain/date';
+import { moodMarkerKey, moodMarkerMap } from '@/domain/mood';
+import type { MoodEntity } from '@/domain/mood';
 import type { ProjectEntity } from '@/domain/types';
 import { historyCopy } from '@/copy/project';
+import { moodCopy } from '@/copy/phase3';
 import { useLiveQuery } from '@/features/common/useLiveQuery';
 import { openRecordDetail } from '@/features/history/RecordDetailSheet';
 import { deleteRecordWithUndo, recordTimeLabel } from '@/features/history/recordActions';
+import { readMoodPath } from '@/features/mood/links';
+import { MoodFaceIcon } from '@/features/mood/MoodFace';
+import { moodService } from '@/services/moodService';
 import { getHistoryMonth, getHistoryMonths, listProjects, type HistoryDay } from '@/services/queries';
 import { AppText } from '@/ui/components/AppText';
 import { Chip } from '@/ui/components/Chip';
@@ -21,12 +28,42 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { ProjectBadge } from '@/ui/components/ProjectBadge';
 import { SwipeToDelete } from '@/ui/components/SwipeToDelete';
 import { TopBar } from '@/ui/components/TopBar';
+import { Icon } from '@/ui/icons/Icon';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 import { inset, radius, space } from '@/ui/tokens';
 
 const PAGE_MONTHS = 3;
 
-function DayGroup({ day, projects }: { day: HistoryDay; projects: Map<string, ProjectEntity> }) {
+/** 记录行上的迷你心情标记：有表情画表情，只有文字或照片时画一小朵云 */
+function MoodMark({ mood }: { mood: MoodEntity }) {
+  const router = useRouter();
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={moodCopy.read}
+      hitSlop={8}
+      onPress={() => router.push(readMoodPath(mood.id))}
+      style={styles.moodMark}
+    >
+      {mood.face ? (
+        <MoodFaceIcon face={mood.face} size={20} />
+      ) : (
+        <Icon name="cloud" size={16} color={colors.textMuted} />
+      )}
+    </Pressable>
+  );
+}
+
+function DayGroup({
+  day,
+  projects,
+  moods,
+}: {
+  day: HistoryDay;
+  projects: Map<string, ProjectEntity>;
+  moods: Map<string, MoodEntity>;
+}) {
   const { colors } = useTheme();
   return (
     <View style={[styles.day, { backgroundColor: colors.card, borderBottomColor: colors.cardEdge }]}>
@@ -40,6 +77,7 @@ function DayGroup({ day, projects }: { day: HistoryDay; projects: Map<string, Pr
         {day.records.map((record, index) => {
           const project = projects.get(record.projectId);
           if (!project) return null;
+          const mood = moods.get(moodMarkerKey(record.date, record.projectId));
           return (
             <SwipeToDelete key={record.id} label={historyCopy.delete} onDelete={() => deleteRecordWithUndo(record.id)}>
               <Pressable
@@ -59,6 +97,7 @@ function DayGroup({ day, projects }: { day: HistoryDay; projects: Map<string, Pr
                   <AppText variant="numberS" tone="secondary">
                     {recordTimeLabel(record)}
                   </AppText>
+                  {mood ? <MoodMark mood={mood} /> : null}
                 </View>
                 {record.note ? (
                   <AppText variant="caption" tone="secondary" numberOfLines={1} style={styles.recordNote}>
@@ -82,9 +121,11 @@ export default function HistoryScreen() {
   const [filter, setFilter] = useState<string | null>(params.projectId ?? null);
   const [loaded, setLoaded] = useState(PAGE_MONTHS);
 
-  const projects = useLiveQuery(listProjects, []);
+  const projects = useLiveQuery(listProjects, [], ['projects']);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
-  const months = useLiveQuery(() => getHistoryMonths(filter), [filter]);
+  const months = useLiveQuery(() => getHistoryMonths(filter), [filter], ['projects', 'checkins']);
+  // 记录列表一次取出心情索引，不为每一行单独查库
+  const moodIndex = useLiveQuery(() => moodMarkerMap(moodService.list()), [], ['moods']);
   const sections = useLiveQuery(
     () =>
       months.slice(0, loaded).map((m) => ({
@@ -93,6 +134,7 @@ export default function HistoryScreen() {
         data: getHistoryMonth(m.month, filter),
       })),
     [months, loaded, filter],
+    ['projects', 'checkins'],
   );
 
   return (
@@ -124,7 +166,7 @@ export default function HistoryScreen() {
             </AppText>
           </View>
         )}
-        renderItem={({ item }) => <DayGroup day={item} projects={projectMap} />}
+        renderItem={({ item }) => <DayGroup day={item} projects={projectMap} moods={moodIndex} />}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           filter === null ? (
@@ -160,4 +202,5 @@ const styles = StyleSheet.create({
   recordMain: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   recordName: { flex: 1 },
   recordNote: { marginLeft: 38 },
+  moodMark: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
 });

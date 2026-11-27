@@ -1,4 +1,4 @@
 /**
- * 备份导出 / 导入 / 表格导出（第 2 期实现）。
+ * .bloom 备份格式的纯数据层出口，App 与 Node 脚本共用。
  */
-export {};
+export * from './format';

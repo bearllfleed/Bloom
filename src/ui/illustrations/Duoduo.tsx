@@ -5,6 +5,7 @@
  */
 import { useEffect } from 'react';
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -13,11 +14,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
 
-import { useMotionReduced } from '@/ui/motion';
+import { useIdleMotion } from '@/ui/motion/idle';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 
 export type DuoduoMood = 'expectant' | 'happy' | 'cheer' | 'surprised' | 'sleepy' | 'puzzled';
-export type DuoduoPose = 'none' | 'wave' | 'seed' | 'cloud' | 'sleep';
+export type DuoduoPose = 'none' | 'wave' | 'seed' | 'cloud' | 'sleep' | 'write';
 export type DuoduoAccessory =
   'plain' | 'strawHat' | 'headband' | 'headphones' | 'glasses' | 'flower' | 'scarf' | 'gradCap';
 
@@ -158,6 +159,18 @@ function Pose({ pose }: { pose: DuoduoPose }) {
       </G>
     );
   }
+  if (pose === 'write') {
+    // 趴着写日记：摊开的小本子 + 铅笔（心情手账空状态）
+    return (
+      <G stroke={INK} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M30 112l14-5 14 5-14 4z" fill="#FFF6D9" />
+        <Path d="M30 112v4l14 4 14-4v-4" fill="#F6EDE4" />
+        <Path d="M37 111l7-2.5 7 2.5" stroke="#FFC7DB" strokeWidth={2} fill="none" />
+        <Path d="M78 104l10-12 4 3-10 12z" fill="#FFD66B" />
+        <Path d="M78 104l-1 5 4 3 1-5z" fill="#F6EDE4" />
+      </G>
+    );
+  }
   return null;
 }
 
@@ -260,11 +273,12 @@ export function Duoduo({
   breathing = false,
 }: DuoduoProps) {
   const { scheme } = useTheme();
-  const reduced = useMotionReduced();
+  const idleAllowed = useIdleMotion();
   const breath = useSharedValue(1);
 
   useEffect(() => {
-    if (!breathing || reduced) {
+    cancelAnimation(breath);
+    if (!breathing || !idleAllowed) {
       breath.value = 1;
       return;
     }
@@ -273,7 +287,11 @@ export function Duoduo({
       -1,
       false,
     );
-  }, [breath, breathing, reduced]);
+    return () => {
+      cancelAnimation(breath);
+      breath.value = 1;
+    };
+  }, [breath, breathing, idleAllowed]);
 
   const style = useAnimatedStyle(() => ({ transform: [{ scaleY: breath.value }], transformOrigin: 'bottom' }));
   const outlineColor = scheme === 'dark' ? 'rgba(255,248,243,0.9)' : null;

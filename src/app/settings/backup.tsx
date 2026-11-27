@@ -46,8 +46,8 @@ export default function BackupScreen() {
   const { colors } = useTheme();
   const every = usePrefs((s) => s.backupEveryDays);
   const update = usePrefs((s) => s.update);
-  const status = useLiveQuery(() => backupService.status(), [every]);
-  const snapshots = useLiveQuery(() => backupService.snapshots(), []);
+  const status = useLiveQuery(() => backupService.status(), [every], ['backup', 'clock']);
+  const snapshots = useLiveQuery(() => backupService.snapshots(), [], ['backup']);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const [packed, setPacked] = useState<{
     name: string;

@@ -21,9 +21,11 @@ import { displayStatusOf } from '@/domain/project';
 import { isDayCompleted, isRequiredKind, ruleOn, visibilityOn } from '@/domain/rule';
 import { completionRateOf, dayOverview, streakOf, type HeatLevel } from '@/domain/stats';
 import type { DailyCounts, LocalDate, ProjectEntity, ProjectSnapshot } from '@/domain/types';
+import { achievementRepo, type StoredUnlock } from '@/data/repositories/achievementRepo';
 import { checkinRepo } from '@/data/repositories/checkinRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
 import { clock } from '@/platform/clock';
+import { getDataRevisions } from '@/stores/dataVersion';
 import { usePrefs } from '@/stores/prefsStore';
 
 export interface HeatCell {
@@ -56,13 +58,51 @@ export interface Habit {
   hourCounts: number[];
 }
 
-function bundle() {
-  const entities = projectRepo.listEntities();
-  const counts = checkinRepo.countsByProject();
-  const settings = { weekStart: usePrefs.getState().weekStart };
-  const today = clock.today();
-  const items = entities.map((project) => ({ project, counts: counts.get(project.id) ?? new Map() }));
-  return { entities, counts, settings, today, items };
+interface StatsSnapshot {
+  key: string;
+  entities: ProjectEntity[];
+  counts: Map<string, DailyCounts>;
+  settings: { weekStart: 1 | 7 };
+  today: LocalDate;
+  items: { project: ProjectEntity; counts: DailyCounts }[];
+  instants: ReturnType<typeof checkinRepo.listInstants> | null;
+  unlocks: { revision: number; value: StoredUnlock[] } | null;
+}
+
+let snapshotCache: StatsSnapshot | null = null;
+
+function bundle(): StatsSnapshot {
+  const revisions = getDataRevisions();
+  const weekStart = usePrefs.getState().weekStart;
+  const key = [revisions.projects, revisions.checkins, revisions.clock, weekStart].join(':');
+  if (!snapshotCache || snapshotCache.key !== key) {
+    const entities = projectRepo.listEntities();
+    const counts = checkinRepo.countsByProject();
+    snapshotCache = {
+      key,
+      entities,
+      counts,
+      settings: { weekStart },
+      today: clock.today(),
+      items: entities.map((project) => ({ project, counts: counts.get(project.id) ?? new Map() })),
+      instants: null,
+      unlocks: null,
+    };
+  }
+  return snapshotCache;
+}
+
+function instantsOf(snapshot: StatsSnapshot): ReturnType<typeof checkinRepo.listInstants> {
+  snapshot.instants ??= checkinRepo.listInstants();
+  return snapshot.instants;
+}
+
+function unlocksOf(snapshot: StatsSnapshot): StoredUnlock[] {
+  const revision = getDataRevisions().achievements;
+  if (!snapshot.unlocks || snapshot.unlocks.revision !== revision) {
+    snapshot.unlocks = { revision, value: achievementRepo.listUnlocks() };
+  }
+  return snapshot.unlocks.value;
 }
 
 function emptyCounts(): DailyCounts {
@@ -143,7 +183,7 @@ export function getOverview() {
     });
     weeks.push({ start, week: isoWeekNumber(start), count });
   }
-  const instants = checkinRepo.listInstants().filter((row) => row.date <= today);
+  const instants = instantsOf(bundle()).filter((row) => row.date <= today);
   let habit: Habit | null = null;
   if (instants.length >= 14) {
     const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
@@ -337,7 +377,15 @@ export function getYearStats(year: number) {
     }))
     .filter((item): item is RankItem => item.rate !== null)
     .sort((a, b) => b.rate - a.rate);
-  return { months, recordDays, total, perfect, graduated, ranking };
+  return {
+    months,
+    recordDays,
+    total,
+    perfect,
+    graduated,
+    achievements: unlocksOf(bundle()).filter((unlock) => new Date(unlock.unlockedAt).getFullYear() === year).length,
+    ranking,
+  };
 }
 
 export function statsBounds() {
@@ -356,14 +404,29 @@ export function statsBounds() {
   };
 }
 
+/** 统计页活动面板的单次主查询。共享 snapshot 保证同修订周期不重复加载仓储。 */
+export function getStatsOverview() {
+  const overview = getOverview();
+  return { ...overview, heat: heatOfYear(parseLocalDate(overview.today).year) };
+}
+
+export function getStatsMonth(month: LocalDate) {
+  return { stats: getMonthStats(month), cells: monthCells(month) };
+}
+
+export function getStatsYear(year: number) {
+  return { stats: getYearStats(year), heat: heatOfYear(year) };
+}
+
 export function projectMonthDone(projectId: string, month: LocalDate): { value: number; unit: 'days' | 'times' } {
-  const project = projectRepo.getEntity(projectId);
+  const snapshot = bundle();
+  const project = snapshot.entities.find((entity) => entity.id === projectId);
   if (!project) return { value: 0, unit: 'days' };
-  const today = clock.today();
+  const today = snapshot.today;
   const from = startOfMonth(month);
   const to = minDate(endOfMonth(month), today);
   if (from > to) return { value: 0, unit: 'days' };
-  const counts = checkinRepo.countsByProject().get(projectId) ?? emptyCounts();
+  const counts = snapshot.counts.get(projectId) ?? emptyCounts();
   const rule = ruleOn(project.ruleVersions, to);
   if (rule.kind === 'weeklyTimes' || rule.kind === 'monthlyTimes') {
     let value = 0;
@@ -383,11 +446,10 @@ export function projectYearCells(
   projectId: string,
   year: number,
 ): { date: LocalDate; state: 'done' | 'missed' | 'none' }[] {
-  const project = projectRepo.getEntity(projectId);
-  const today = clock.today();
-  const counts = project
-    ? checkinRepo.dailyCounts(projectId, makeLocalDate(year, 1, 1), makeLocalDate(year, 12, 31))
-    : emptyCounts();
+  const snapshot = bundle();
+  const project = snapshot.entities.find((entity) => entity.id === projectId);
+  const today = snapshot.today;
+  const counts = project ? (snapshot.counts.get(projectId) ?? emptyCounts()) : emptyCounts();
   const cells: { date: LocalDate; state: 'done' | 'missed' | 'none' }[] = [];
   if (!project) return cells;
   for (const date of eachDay(makeLocalDate(year, 1, 1), makeLocalDate(year, 12, 31))) {

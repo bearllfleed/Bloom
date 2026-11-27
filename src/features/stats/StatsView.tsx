@@ -9,16 +9,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addMonths, formatMonthDay, formatYearMonth, parseLocalDate, startOfMonth, weekdayChar } from '@/domain/date';
 import type { LocalDate } from '@/domain/types';
 import { statsCopy } from '@/copy/phase2';
+import { useCommitPerfTrace } from '@/features/common/useCommitPerfTrace';
 import { useLiveQuery } from '@/features/common/useLiveQuery';
+import { assignDayMoods } from '@/features/today/moodAssignments';
 import { TodayCard } from '@/features/today/TodayCard';
 import { getDayView } from '@/services/queries';
+import { moodService } from '@/services/moodService';
 import {
   daysInYearSoFar,
-  getMonthStats,
-  getOverview,
-  getYearStats,
-  heatOfYear,
-  monthCells,
+  getStatsMonth,
+  getStatsOverview,
+  getStatsYear,
   statsBounds,
   type HeatCell,
 } from '@/services/statsQuery';
@@ -49,12 +50,19 @@ function openDay(date: LocalDate) {
 }
 
 function DayList({ date }: { date: LocalDate }) {
-  const view = useLiveQuery(() => getDayView(date), [date]);
+  const view = useLiveQuery(() => getDayView(date), [date], ['projects', 'checkins', 'clock']);
+  const moods = useLiveQuery(() => assignDayMoods(moodService.listForDate(date)), [date], ['moods']);
   return (
     <View style={styles.dayList}>
       <AppText variant="title3">{formatMonthDay(date)}</AppText>
       {view.items.map((item) => (
-        <TodayCard key={item.project.id} item={item} date={date} today={view.today} />
+        <TodayCard
+          key={item.project.id}
+          item={item}
+          date={date}
+          today={view.today}
+          mood={moods.projectMoods.get(item.project.id) ?? null}
+        />
       ))}
       {view.items.length === 0 ? (
         <AppText variant="callout" tone="muted">
@@ -70,7 +78,8 @@ export function StatsView() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('overview');
   const weekStart = usePrefs((s) => s.weekStart);
-  const bounds = useLiveQuery(statsBounds, [weekStart]);
+  const bounds = useLiveQuery(statsBounds, [weekStart], ['projects', 'checkins', 'clock']);
+  const startStatsTrace = useCommitPerfTrace('interaction.stats', tab);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -99,7 +108,10 @@ export function StatsView() {
               { value: 'year', label: statsCopy.year },
             ]}
             value={tab}
-            onChange={setTab}
+            onChange={(next) => {
+              startStatsTrace();
+              setTab(next);
+            }}
           />
           {tab === 'overview' ? <Overview /> : null}
           {tab === 'month' ? <MonthPanel min={bounds.min} max={bounds.max} today={bounds.today} /> : null}
@@ -112,11 +124,10 @@ export function StatsView() {
 
 function Overview() {
   const weekStart = usePrefs((s) => s.weekStart);
-  const data = useLiveQuery(getOverview, [weekStart]);
+  const data = useLiveQuery(getStatsOverview, [weekStart], ['projects', 'checkins', 'clock']);
   const { year } = parseLocalDate(data.today);
   const place = daysInYearSoFar(data.today);
   const [caption, setCaption] = useState<string | null>(null);
-  const heat = useLiveQuery(() => heatOfYear(year), [year, weekStart]);
   const maxWeek = Math.max(1, ...data.weeks.map((point) => point.count));
 
   return (
@@ -135,7 +146,7 @@ function Overview() {
       <StickerCard>
         <AppText variant="title3">{statsCopy.garden}</AppText>
         <YearHeat
-          rows={heat}
+          rows={data.heat}
           onPick={(cell) =>
             cell.planned > 0 &&
             setCaption(statsCopy.heatCaption(formatMonthDay(cell.date), cell.completed, cell.planned))
@@ -252,8 +263,11 @@ function LegendDot({ level }: { level: number }) {
 function MonthPanel({ min, max, today }: { min: LocalDate; max: LocalDate; today: LocalDate }) {
   const [month, setMonth] = useState(startOfMonth(today));
   const weekStart = usePrefs((s) => s.weekStart);
-  const stats = useLiveQuery(() => getMonthStats(month), [month, weekStart]);
-  const cells = useLiveQuery(() => monthCells(month), [month, weekStart]);
+  const { stats, cells } = useLiveQuery(
+    () => getStatsMonth(month),
+    [month, weekStart],
+    ['projects', 'checkins', 'clock'],
+  );
   const canPrev = month > min;
   const canNext = month < max;
   const delta =
@@ -344,8 +358,11 @@ function MonthPanel({ min, max, today }: { min: LocalDate; max: LocalDate; today
 function YearPanel({ today, min }: { today: LocalDate; min: LocalDate }) {
   const [year, setYear] = useState(parseLocalDate(today).year);
   const weekStart = usePrefs((s) => s.weekStart);
-  const stats = useLiveQuery(() => getYearStats(year), [year, weekStart]);
-  const heat = useLiveQuery(() => heatOfYear(year), [year, weekStart]);
+  const { stats, heat } = useLiveQuery(
+    () => getStatsYear(year),
+    [year, weekStart],
+    ['projects', 'checkins', 'achievements', 'clock'],
+  );
   const minYear = parseLocalDate(min).year;
   const maxYear = parseLocalDate(today).year;
   const maxDays = Math.max(1, ...stats.months.map((item) => item.days));
@@ -385,6 +402,9 @@ function YearPanel({ today, min }: { today: LocalDate; min: LocalDate }) {
           <StatTile label={statsCopy.perfect} value={stats.perfect} unit={statsCopy.unitDay} size="M" />
           <StatTile label={statsCopy.graduated} value={stats.graduated} unit={statsCopy.unitCount} size="M" />
         </View>
+      </StickerCard>
+      <StickerCard>
+        <StatTile label="获得徽章" value={stats.achievements} unit="枚" size="M" />
       </StickerCard>
       <Ranking items={stats.ranking} />
       <StickerCard>

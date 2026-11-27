@@ -97,7 +97,7 @@ interface RowsProps {
 const WeekRows = memo(function WeekRows({ rows, month, selected, today, onSelect }: RowsProps) {
   const from = rows[0][0];
   const to = rows[rows.length - 1][6];
-  const marks = useLiveQuery(() => getDayMarks(from, to), [from, to]);
+  const marks = useLiveQuery(() => getDayMarks(from, to), [from, to], ['projects', 'checkins', 'clock']);
   return (
     <View style={styles.rows}>
       {rows.map((week) => (

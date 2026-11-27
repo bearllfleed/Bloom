@@ -7,7 +7,10 @@ import type { LocalDate } from '@/domain/types';
 export type DataEvent =
   | { type: 'checkinChanged'; projectId: string; date: LocalDate }
   | { type: 'projectChanged'; projectId: string }
+  | { type: 'projectsChanged' }
   | { type: 'moodChanged'; date: LocalDate; projectId: string | null }
+  | { type: 'achievementChanged' }
+  | { type: 'backupChanged' }
   | { type: 'dataReplaced' };
 
 type Listener = (event: DataEvent) => void;

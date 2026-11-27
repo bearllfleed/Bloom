@@ -1,16 +1,22 @@
 /**
  * 今日页项目卡片（第 1 期 1-2"项目卡片"）：左贴纸图标、中名称与副文案、右花苞按钮。
- * - 点空白处 → 项目详情；点花苞 → 打卡；长按 → 菜单（撤销一次、写成绩、查看详情）；
- * - 完成后底色从花苞中心圆形扩散为项目浅色（M02 卡片部分）。
+ * - 点空白处 → 项目详情；点花苞 → 打卡；长按 → 菜单（撤销一次、写成绩、写/看心情、查看详情）；
+ * - 完成后底色从花苞中心圆形扩散为项目浅色（M02 卡片部分）；
+ * - 第 3 期 3-7：当天完成后副文案末尾出现心情入口（小云朵，写过换成迷你表情）。
  */
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
+import type { MoodEntity } from '@/domain/mood';
+import { canShowProjectMood } from '@/domain/achievement/presentation';
 import { formatClock } from '@/domain/date';
 import type { LocalDate } from '@/domain/types';
+import { moodCopy } from '@/copy/phase3';
 import { blockReasonCopy, todayCopy } from '@/copy/today';
+import { MoodFaceIcon } from '@/features/mood/MoodFace';
+import { readMoodPath, writeMoodPath } from '@/features/mood/links';
 import type { DayItem } from '@/services/queries';
 import { overlay, type MenuItem } from '@/stores/overlayQueue';
 import { AppText } from '@/ui/components/AppText';
@@ -18,6 +24,7 @@ import { BloomButton } from '@/ui/components/BloomButton';
 import { ProjectBadge, projectColorOf } from '@/ui/components/ProjectBadge';
 import { RippleFill } from '@/ui/components/RippleFill';
 import { StickerCard } from '@/ui/components/StickerCard';
+import { Icon } from '@/ui/icons/Icon';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 import { inset, space } from '@/ui/tokens';
 
@@ -46,16 +53,18 @@ export function TodayCard({
   item,
   date,
   today,
+  mood,
   pulseToken = 0,
 }: {
   item: DayItem;
   date: LocalDate;
   today: LocalDate;
+  mood: MoodEntity | null;
   /** 变化时把卡片轻轻弹一下，用来响应通知点击 */
   pulseToken?: number;
 }) {
   const router = useRouter();
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
   const { project, state } = item;
   const color = projectColorOf(project.colorId);
   const anchor = useRef<ComponentRef<typeof View>>(null);
@@ -67,6 +76,13 @@ export function TodayCard({
   }, [pulseToken, scale]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
+  // 心情由页面按日期一次性读取后分配给卡片，避免逐卡同步查询。
+  const moodEntry = canShowProjectMood({
+    completed: state.dayCompleted,
+    hasMood: mood !== null,
+    future: date > today,
+  });
+
   const openMenu = (withDetail: boolean) => {
     const items: MenuItem[] = [];
     if (state.count > 0) {
@@ -74,6 +90,21 @@ export function TodayCard({
       if (project.noteEnabled) {
         items.push({ label: todayCopy.menuNote, icon: 'note', onPress: () => editLatestNote(project, date) });
       }
+    }
+    if (moodEntry) {
+      items.push(
+        mood
+          ? {
+              label: moodCopy.read,
+              icon: 'note',
+              onPress: () => router.push(readMoodPath(mood.id)),
+            }
+          : {
+              label: moodCopy.write,
+              icon: 'edit',
+              onPress: () => router.push(writeMoodPath(date, project.id)),
+            },
+      );
     }
     if (withDetail) {
       items.push({
@@ -86,6 +117,11 @@ export function TodayCard({
     anchor.current?.measureInWindow((_x: number, y: number, _w: number, h: number) =>
       overlay.openMenu(items, y + h / 2),
     );
+  };
+
+  const onMoodPress = () => {
+    if (mood) router.push(readMoodPath(mood.id));
+    else router.push(writeMoodPath(date, project.id));
   };
 
   const onBloomPress = () => {
@@ -119,9 +155,26 @@ export function TodayCard({
               {project.name}
             </AppText>
             {subtitle ? (
-              <AppText variant="caption" tone="secondary" numberOfLines={1}>
-                {subtitle}
-              </AppText>
+              <View style={styles.subtitleRow}>
+                <AppText variant="caption" tone="secondary" numberOfLines={1} style={styles.subtitleText}>
+                  {subtitle}
+                </AppText>
+                {moodEntry ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={mood ? moodCopy.read : moodCopy.write}
+                    hitSlop={12}
+                    onPress={onMoodPress}
+                    style={styles.moodSlot}
+                  >
+                    {mood?.face ? (
+                      <MoodFaceIcon face={mood.face} size={16} />
+                    ) : (
+                      <Icon name="cloud" size={16} color={colors.textMuted} />
+                    )}
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
           </View>
           <BloomButton
@@ -156,4 +209,8 @@ const styles = StyleSheet.create({
     padding: inset.card,
   },
   text: { flex: 1, gap: 2 },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  subtitleText: { flexShrink: 1 },
+  /** 视觉 16pt、热区 32×32，跟副文案基线居中对齐 */
+  moodSlot: { width: 32, height: 32, marginVertical: -8, alignItems: 'center', justifyContent: 'center' },
 });

@@ -8,26 +8,32 @@ import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { bootCopy, trustCopy } from '@/copy/common';
+import { bootCopy, bootFailureCopyFor, trustCopy } from '@/copy/common';
+import { presentPendingUnlocks } from '@/features/achievement';
 import { presentPendingGraduations } from '@/features/graduation/present';
 import { openChangelog } from '@/features/settings/ChangelogSheet';
-import { isDevToolsEnabled } from '@/platform/appVariant';
+import { appBuild, appVersion } from '@/platform/appInfo';
+import { appVariant, isDevToolsEnabled } from '@/platform/appVariant';
 import { clock } from '@/platform/clock';
 import { shareDiagnostics } from '@/platform/diagnostics';
 import { files } from '@/platform/files';
+import { createLogger } from '@/platform/logger';
 import { notifications } from '@/platform/notifications';
+import { flushPerfTrace, perfTrace } from '@/platform/perfTrace';
+import { createStartupCommitGate } from '@/platform/startupCommit';
 import { backupErrorText, parseBackup, stageBackup } from '@/services/backupService';
 import { markChangelogSeen, pendingChangelog } from '@/services/changelogService';
 import { events } from '@/services/events';
 import { bootstrap, onBackground, onForeground, type BootResult } from '@/services/lifecycleService';
+import { achievementService } from '@/services/achievementService';
 import { overlay } from '@/stores/overlayQueue';
 import { usePrefs } from '@/stores/prefsStore';
 import { useTodayStore } from '@/stores/todayStore';
-import { AppText } from '@/ui/components/AppText';
+import { AppText, FontAvailabilityProvider } from '@/ui/components/AppText';
 import { CandyButton } from '@/ui/components/CandyButton';
 import { TimeTravelBanner } from '@/ui/components/TimeTravelBanner';
 import { Duoduo } from '@/ui/illustrations/Duoduo';
@@ -36,18 +42,43 @@ import { OverlayHost } from '@/ui/overlay/OverlayHost';
 import { ThemeProvider, useTheme } from '@/ui/theme/ThemeProvider';
 import { space } from '@/ui/tokens';
 
+const FONT_WAIT_TIMEOUT_MS = 2500;
+const startupLog = createLogger('startup');
+const perfLog = createLogger('performance');
+
+perfTrace.mark('startup.js');
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function hideSplash(): void {
+  perfTrace.mark('startup.splash_hide_request');
+  void SplashScreen.hideAsync().then(
+    () => {
+      perfTrace.mark('startup.splash_hide_complete');
+      flushPerfTrace(perfLog, { buildId: `${appVersion}(${appBuild})/${appVariant}` });
+    },
+    (error: unknown) => {
+      startupLog.warn('启动画面隐藏失败', error);
+    },
+  );
+}
+
+const startupCommitGate = createStartupCommitGate((stage) => perfTrace.mark(stage), hideSplash);
 
 function BootFailure({ result }: { result: Extract<BootResult, { ok: false }> }) {
   const { colors } = useTheme();
+  const copy = bootFailureCopyFor(result.reason);
   return (
     <View style={[styles.boot, { backgroundColor: colors.background }]}>
       <Duoduo size={120} mood="puzzled" />
       <AppText variant="title2" align="center">
-        {bootCopy.upgradeFailedTitle}
+        {copy.title}
       </AppText>
       <AppText variant="body" tone="secondary" align="center">
-        {bootCopy.upgradeFailedMessage}
+        {copy.message}
       </AppText>
       <AppText variant="caption" tone="muted" align="center">
         {result.message}
@@ -121,11 +152,19 @@ function RootNavigator() {
   useEffect(() => {
     if (!onboarded) return;
     presentPendingGraduations();
-    const stop = events.subscribe(() => presentPendingGraduations());
+    presentPendingUnlocks();
+    const stop = events.subscribe((event) => {
+      if (event.type === 'projectChanged' || event.type === 'projectsChanged' || event.type === 'dataReplaced') {
+        presentPendingGraduations();
+      }
+    });
+    // 新徽章停手 1.2 秒后才通知；启动时也要补弹上次没看完的
+    const stopUnlocks = achievementService.onUnlocked(() => presentPendingUnlocks());
     const entry = pendingChangelog();
     const timer = entry ? setTimeout(() => openChangelog(entry, markChangelogSeen), 600) : null;
     return () => {
       stop();
+      stopUnlocks();
       if (timer) clearTimeout(timer);
     };
   }, [onboarded]);
@@ -158,6 +197,9 @@ function RootNavigator() {
         <Stack.Screen name="project/[id]/index" />
         <Stack.Screen name="project/[id]/edit" options={formScreenOptions} />
         <Stack.Screen name="history" />
+        <Stack.Screen name="mood/index" />
+        <Stack.Screen name="mood/[id]" />
+        <Stack.Screen name="mood/editor" options={formScreenOptions} />
         <Stack.Screen name="project/[id]/review" />
         <Stack.Screen name="settings/about" />
         <Stack.Screen name="settings/reminders" />
@@ -173,25 +215,55 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Fredoka_500Medium,
     Fredoka_600SemiBold,
   });
+  const [fontWaitExpired, setFontWaitExpired] = useState(false);
   const [boot, setBoot] = useState<BootResult | null>(null);
+  const loggedFontError = useRef<Error | null>(null);
+  const fontTimeoutLogged = useRef(false);
+  const fontsReady = fontsLoaded || fontError !== null || fontWaitExpired;
 
   useEffect(() => {
-    setBoot(bootstrap());
+    startupCommitGate.onRootCommit();
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded && boot) SplashScreen.hideAsync().catch(() => undefined);
-  }, [fontsLoaded, boot]);
+    if (fontsLoaded || fontError !== null) return;
+    const timer = setTimeout(() => {
+      if (!fontTimeoutLogged.current) {
+        fontTimeoutLogged.current = true;
+        startupLog.warn('字体加载超时，改用系统字体');
+      }
+      setFontWaitExpired(true);
+    }, FONT_WAIT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [fontError, fontsLoaded]);
 
-  if (!fontsLoaded || !boot) return null;
+  useEffect(() => {
+    if (fontError === null || loggedFontError.current === fontError) return;
+    loggedFontError.current = fontError;
+    startupLog.warn('字体加载失败，改用系统字体', fontError);
+  }, [fontError]);
+
+  useEffect(() => {
+    try {
+      setBoot(bootstrap());
+    } catch (error) {
+      const failure = asError(error);
+      startupLog.error('启动流程异常', failure);
+      setBoot({ ok: false, reason: 'bootstrap', message: failure.message });
+    }
+  }, []);
+
+  if (!fontsReady || !boot) return null;
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <ThemeProvider>{boot.ok ? <RootNavigator /> : <BootFailure result={boot} />}</ThemeProvider>
+    <GestureHandlerRootView style={styles.root} onLayout={startupCommitGate.onFirstRenderableLayout}>
+      <FontAvailabilityProvider available={fontsLoaded}>
+        <ThemeProvider>{boot.ok ? <RootNavigator /> : <BootFailure result={boot} />}</ThemeProvider>
+      </FontAvailabilityProvider>
     </GestureHandlerRootView>
   );
 }

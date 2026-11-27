@@ -47,9 +47,17 @@ export function ProjectCalendar({
 }) {
   const { colors } = useTheme();
   const [month, setMonth] = useState(startOfMonth(today));
-  const bounds = useLiveQuery(() => getProjectMonthBounds(projectId), [projectId]);
-  const weeks = useLiveQuery(() => getProjectMonth(projectId, month), [projectId, month, weekStart]);
-  const done = useLiveQuery(() => projectMonthDone(projectId, month), [projectId, month]);
+  const bounds = useLiveQuery(() => getProjectMonthBounds(projectId), [projectId], ['projects', 'clock']);
+  const weeks = useLiveQuery(
+    () => getProjectMonth(projectId, month),
+    [projectId, month, weekStart],
+    ['projects', 'checkins', 'clock'],
+  );
+  const done = useLiveQuery(
+    () => projectMonthDone(projectId, month),
+    [projectId, month],
+    ['projects', 'checkins', 'clock'],
+  );
   const canPrev = month > bounds.min;
   const canNext = month < bounds.max;
   const header = weekStart === 1 ? [1, 2, 3, 4, 5, 6, 7] : [7, 1, 2, 3, 4, 5, 6];

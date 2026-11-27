@@ -38,23 +38,23 @@ import { checkinRepo } from '@/data/repositories/checkinRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
 import { clock } from '@/platform/clock';
 import { usePrefs } from '@/stores/prefsStore';
-
-import { events } from './events';
+import { dataRevisionKey } from '@/stores/dataVersion';
 
 interface BaseData {
   entities: ProjectEntity[];
   counts: Map<string, DailyCounts>;
 }
 
-let cache: BaseData | null = null;
-events.subscribe(() => (cache = null));
-clock.subscribe(() => (cache = null));
+let cache: { key: string; data: BaseData } | null = null;
 
 const EMPTY: DailyCounts = new Map();
 
 function base(): BaseData {
-  if (!cache) cache = { entities: projectRepo.listEntities(), counts: checkinRepo.countsByProject() };
-  return cache;
+  const key = dataRevisionKey(['projects', 'checkins', 'clock']);
+  if (!cache || cache.key !== key) {
+    cache = { key, data: { entities: projectRepo.listEntities(), counts: checkinRepo.countsByProject() } };
+  }
+  return cache.data;
 }
 
 function countsOf(projectId: string): DailyCounts {
@@ -94,14 +94,20 @@ export function getDayView(date: LocalDate): DayView {
     state: dayCardState(project, date, today, countsOf(project.id), settings()),
     lastCheckedAt: latest.get(project.id) ?? null,
   }));
-  const overview = dayOverview(
-    entities.map((project) => ({ project, counts: countsOf(project.id) })),
-    date,
-  );
+  const overview = getDayOverview(date);
   let empty: DayEmptyReason = null;
   if (entities.length === 0) empty = 'noProjects';
   else if (items.length === 0) empty = entities.every((p) => date < p.startDate) ? 'beforeAll' : 'restDay';
   return { date, today, items, overview, empty };
+}
+
+/** 只计算一天的概览，不读取卡片需要的最后打卡时间。 */
+export function getDayOverview(date: LocalDate): DayOverview {
+  const { entities } = base();
+  return dayOverview(
+    entities.map((project) => ({ project, counts: countsOf(project.id) })),
+    date,
+  );
 }
 
 export function hasAnyProject(): boolean {

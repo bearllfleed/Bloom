@@ -14,6 +14,7 @@ import { createContext, use, useSyncExternalStore, type ReactNode } from 'react'
 import { AppState } from 'react-native';
 
 import { useMotionReduced } from './index';
+import { idleMotionAllowed } from './idleState';
 
 const ScreenActiveContext = createContext(true);
 
@@ -36,7 +37,7 @@ export function useIdleMotion(): boolean {
   const reduced = useMotionReduced();
   const appActive = useAppActive();
   const screenActive = use(ScreenActiveContext);
-  return !reduced && appActive && screenActive;
+  return idleMotionAllowed(reduced, appActive, screenActive);
 }
 
 function FocusGate({ children }: { children: ReactNode }) {

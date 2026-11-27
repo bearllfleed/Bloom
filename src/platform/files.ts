@@ -71,6 +71,45 @@ export const files = {
     await Sharing.shareAsync(uri, { mimeType, dialogTitle, UTI: 'com.bloom.habit.backup' });
   },
 
+  /** 读取 media/mood 中的单张照片；文件名由备份模块预先校验 */
+  readMoodPhoto(fileName: string): Uint8Array | null {
+    const file = new File(Paths.document, 'media', 'mood', fileName);
+    return file.exists ? file.bytesSync() : null;
+  },
+
+  /** 恢复前把照片写进同文件系统的新目录，调用方成功后再整体替换 */
+  writeMoodPhotoStaging(restoreId: string, fileName: string, bytes: Uint8Array): void {
+    const file = new File(Paths.document, 'media', `.restore-${restoreId}`, fileName);
+    if (!file.parentDirectory.exists) file.parentDirectory.create({ intermediates: true, idempotent: true });
+    if (file.exists) file.delete();
+    file.create();
+    file.writeSync(bytes);
+  },
+
+  /** 数据库恢复成功后切换媒体目录；旧目录先改名，避免半途丢照片 */
+  commitMoodPhotoStaging(restoreId: string): void {
+    const media = new Directory(Paths.document, 'media');
+    if (!media.exists) media.create({ intermediates: true, idempotent: true });
+    const current = new Directory(media, 'mood');
+    const staged = new Directory(media, `.restore-${restoreId}`);
+    const previous = new Directory(media, `.previous-${restoreId}`);
+    if (previous.exists) previous.delete();
+    if (current.exists) current.moveSync(previous);
+    try {
+      staged.moveSync(current);
+      if (previous.exists) previous.delete();
+    } catch (error) {
+      if (!current.exists && previous.exists) previous.moveSync(current);
+      throw error;
+    }
+  },
+
+  /** 导入失败时只清掉临时目录，不碰现有照片 */
+  removeMoodPhotoStaging(restoreId: string): void {
+    const staged = new Directory(Paths.document, 'media', `.restore-${restoreId}`);
+    if (staged.exists) staged.delete();
+  },
+
   /** 从微信或文件 App 丢进来的地址，复制进缓存后再读 */
   adopt(uri: string): string {
     const name = `incoming-${clock.systemNow()}.bloom`;

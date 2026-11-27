@@ -192,7 +192,7 @@ export const projectService = {
 
   reorder(projectIds: readonly string[]): void {
     projectRepo.setOrder(projectIds);
-    events.emit({ type: 'dataReplaced' });
+    events.emit({ type: 'projectsChanged' });
   },
 
   /** 提前毕业：从今天起不再出现，记录保留，并等待毕业典礼 */
@@ -240,7 +240,7 @@ export const projectService = {
       }
     });
     log.info(`自动毕业 ${graduated.length} 个项目`);
-    events.emit({ type: 'dataReplaced' });
+    events.emit({ type: 'projectsChanged' });
     return graduated;
   },
 };
