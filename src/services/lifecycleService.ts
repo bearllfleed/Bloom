@@ -9,45 +9,124 @@ import { getDatabase, openBloomDatabase } from '@/data/db/client';
 import { metaRepo } from '@/data/repositories/metaRepo';
 import { clock } from '@/platform/clock';
 import { createLogger } from '@/platform/logger';
+import { isPerfDatasetId, perfTrace, type PerfStage } from '@/platform/perfTrace';
 import { applyPrefsOnLaunch } from '@/stores/prefsStore';
+import { invalidateDataDomains } from '@/stores/dataVersion';
 
 import { achievementService } from './achievementService';
 import { backupService } from './backupService';
-import { events } from './events';
 import { projectService } from './projectService';
 import { reminderService } from './reminderService';
 
 const log = createLogger('lifecycle');
 
-export type BootResult = { ok: true } | { ok: false; reason: 'database'; message: string };
+export type BootFailureReason =
+  | 'preferences'
+  | 'database'
+  | 'first_use_date'
+  | 'achievement_baseline'
+  | 'cleanup'
+  | 'auto_graduate'
+  | 'reminders'
+  | 'bootstrap';
+
+export type BootResult = { ok: true } | { ok: false; reason: BootFailureReason; message: string };
 
 let booted: BootResult | null = null;
+let lastLogicalDate: string | null = null;
 
-/** 只执行一次；失败时返回原因，由界面展示"数据升级没有成功" */
+type StartupStageResult<T> = { ok: true; value: T } | { ok: false; failure: Extract<BootResult, { ok: false }> };
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function bootFailure(reason: BootFailureReason, error: unknown): Extract<BootResult, { ok: false }> {
+  const cause = asError(error);
+  log.error(`启动阶段失败：${reason}`, cause);
+  return { ok: false, reason, message: cause.message };
+}
+
+function runStartupStage<T>(stage: PerfStage, reason: BootFailureReason, task: () => T): StartupStageResult<T> {
+  const span = perfTrace.begin(stage);
+  try {
+    return { ok: true, value: task() };
+  } catch (error) {
+    return { ok: false, failure: bootFailure(reason, error) };
+  } finally {
+    perfTrace.end(span);
+  }
+}
+
+function runStartupTask<T>(reason: BootFailureReason, task: () => T): StartupStageResult<T> {
+  try {
+    return { ok: true, value: task() };
+  } catch (error) {
+    return { ok: false, failure: bootFailure(reason, error) };
+  }
+}
+
+function attachPerfDataset(): void {
+  try {
+    const datasetId = metaRepo.get('perf_fixture_id');
+    if (isPerfDatasetId(datasetId)) perfTrace.setContext({ datasetId });
+  } catch {
+    // 可选诊断标识不能改变启动错误语义
+  }
+}
+
+/** 只执行一次；所有失败都缓存为可渲染结果，数据库失败保留原有升级错误语义。 */
 export function bootstrap(): BootResult {
   if (booted) return booted;
-  applyPrefsOnLaunch();
-  const opened = openBloomDatabase();
-  if (!opened.ok) {
-    booted = { ok: false, reason: 'database', message: opened.error.message };
+  const total = perfTrace.begin('startup.bootstrap');
+  try {
+    const preferences = runStartupStage('startup.preferences', 'preferences', applyPrefsOnLaunch);
+    if (!preferences.ok) return (booted = preferences.failure);
+
+    const database = runStartupStage('startup.database', 'database', openBloomDatabase);
+    if (!database.ok) return (booted = database.failure);
+    if (!database.value.ok) return (booted = bootFailure('database', database.value.error));
+
+    const firstUse = runStartupStage('startup.first_use_date', 'first_use_date', () => {
+      getDatabase().runSync("INSERT OR IGNORE INTO meta (key, value) VALUES ('first_use_date', ?)", [clock.today()]);
+    });
+    if (!firstUse.ok) return (booted = firstUse.failure);
+
+    attachPerfDataset();
+    // 先于自动毕业启动：首次升级的基线补发在前，启动时毕业的徽章照常弹出
+    const achievementBaseline = runStartupStage('startup.achievement_baseline', 'achievement_baseline', () =>
+      achievementService.start(),
+    );
+    if (!achievementBaseline.ok) return (booted = achievementBaseline.failure);
+
+    const cleanup = runStartupStage('startup.cleanup', 'cleanup', () => projectService.purgeDeleted());
+    if (!cleanup.ok) return (booted = cleanup.failure);
+
+    const autoGraduate = runStartupStage('startup.auto_graduate', 'auto_graduate', () => projectService.autoGraduate());
+    if (!autoGraduate.ok) return (booted = autoGraduate.failure);
+
+    const reminders = runStartupTask('reminders', () => reminderService.start());
+    if (!reminders.ok) return (booted = reminders.failure);
+
+    log.info('启动完成');
+    lastLogicalDate = clock.today();
+    booted = { ok: true };
     return booted;
+  } catch (error) {
+    booted = bootFailure('bootstrap', error);
+    return booted;
+  } finally {
+    perfTrace.end(total);
   }
-  getDatabase().runSync("INSERT OR IGNORE INTO meta (key, value) VALUES ('first_use_date', ?)", [clock.today()]);
-  // 先于自动毕业启动：首次升级的基线补发在前，启动时毕业的徽章照常弹出
-  achievementService.start();
-  projectService.purgeDeleted();
-  projectService.autoGraduate();
-  reminderService.start();
-  log.info('启动完成');
-  booted = { ok: true };
-  return booted;
 }
 
 export function onForeground(): void {
   if (!booted?.ok) return;
+  const today = clock.today();
+  if (lastLogicalDate !== null && lastLogicalDate !== today) invalidateDataDomains(['clock']);
+  lastLogicalDate = today;
   projectService.autoGraduate();
   backupService.maybeWeeklySnapshot();
-  events.emit({ type: 'dataReplaced' });
 }
 
 export function onBackground(): void {

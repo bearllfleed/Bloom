@@ -5,6 +5,7 @@
  */
 import { useEffect } from 'react';
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -13,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
 
-import { useMotionReduced } from '@/ui/motion';
+import { useIdleMotion } from '@/ui/motion/idle';
 import { useTheme } from '@/ui/theme/ThemeProvider';
 
 export type DuoduoMood = 'expectant' | 'happy' | 'cheer' | 'surprised' | 'sleepy' | 'puzzled';
@@ -272,11 +273,12 @@ export function Duoduo({
   breathing = false,
 }: DuoduoProps) {
   const { scheme } = useTheme();
-  const reduced = useMotionReduced();
+  const idleAllowed = useIdleMotion();
   const breath = useSharedValue(1);
 
   useEffect(() => {
-    if (!breathing || reduced) {
+    cancelAnimation(breath);
+    if (!breathing || !idleAllowed) {
       breath.value = 1;
       return;
     }
@@ -285,7 +287,11 @@ export function Duoduo({
       -1,
       false,
     );
-  }, [breath, breathing, reduced]);
+    return () => {
+      cancelAnimation(breath);
+      breath.value = 1;
+    };
+  }, [breath, breathing, idleAllowed]);
 
   const style = useAnimatedStyle(() => ({ transform: [{ scaleY: breath.value }], transformOrigin: 'bottom' }));
   const outlineColor = scheme === 'dark' ? 'rgba(255,248,243,0.9)' : null;

@@ -21,6 +21,7 @@ import { metaRepo } from '@/data/repositories/metaRepo';
 import { projectRepo } from '@/data/repositories/projectRepo';
 import { clock } from '@/platform/clock';
 import { createLogger } from '@/platform/logger';
+import { getDataRevisions } from '@/stores/dataVersion';
 import { usePrefs } from '@/stores/prefsStore';
 
 import { events } from './events';
@@ -73,6 +74,28 @@ function loadInput(groups: ReadonlySet<MetricGroup>): AchievementInput {
 let presentTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
+export interface AchievementGallerySnapshot {
+  unlocks: StoredUnlock[];
+  owned: ReadonlySet<string>;
+  progress: Metrics;
+}
+
+let galleryCache: { key: string; snapshot: AchievementGallerySnapshot } | null = null;
+
+function galleryRevisionKey(): string {
+  const revisions = getDataRevisions();
+  const { weekStart, dayEndHour } = usePrefs.getState();
+  return [
+    revisions.projects,
+    revisions.checkins,
+    revisions.moods,
+    revisions.achievements,
+    revisions.clock,
+    weekStart,
+    dayEndHour,
+  ].join(':');
+}
+
 /** 有新徽章、或者还在等停手时重新计时 */
 function schedulePresent(): void {
   if (presentTimer) clearTimeout(presentTimer);
@@ -94,6 +117,7 @@ function settle(groups: ReadonlySet<MetricGroup>, silent: boolean): SettlePlan |
     });
     if (plan.presentation !== null) {
       achievementRepo.insertUnlocks(plan.ids, now, { silent, presentation: plan.presentation });
+      events.emit({ type: 'achievementChanged' });
       log.info(`获得徽章 ${plan.ids.join('、')}${silent ? '（补发）' : ''}`);
     }
     if (plan.presentation !== null || presentTimer) schedulePresent();
@@ -114,7 +138,11 @@ export const achievementService = {
     started = true;
     if (metaRepo.get(BASELINE_KEY) === null) this.settleSilently();
     events.subscribe((event) => {
-      settle(groupsForTrigger(event.type), false);
+      if (event.type === 'projectChanged' || event.type === 'projectsChanged') {
+        settle(groupsForTrigger('projectChanged'), false);
+      } else if (event.type === 'checkinChanged' || event.type === 'moodChanged' || event.type === 'dataReplaced') {
+        settle(groupsForTrigger(event.type), false);
+      }
     });
   },
 
@@ -128,6 +156,7 @@ export const achievementService = {
   /** 计数器变了但没有数据事件时调用（如导出备份） */
   settleCounters(): void {
     settle(new Set<MetricGroup>(['counters']), false);
+    events.emit({ type: 'achievementChanged' });
   },
 
   /** 全部已获徽章，按获得时间、编号排列 */
@@ -140,6 +169,23 @@ export const achievementService = {
     return computeMetrics(loadInput(ALL_GROUPS), ALL_GROUPS);
   },
 
+  /** 成就馆一次读取完整展示数据，并按相关修订复用结果。 */
+  gallerySnapshot(): AchievementGallerySnapshot {
+    const key = galleryRevisionKey();
+    if (!galleryCache || galleryCache.key !== key) {
+      const unlocks = achievementRepo.listUnlocks();
+      galleryCache = {
+        key,
+        snapshot: {
+          unlocks,
+          owned: new Set(unlocks.map((unlock) => unlock.id)),
+          progress: computeMetrics(loadInput(ALL_GROUPS), ALL_GROUPS),
+        },
+      };
+    }
+    return galleryCache.snapshot;
+  },
+
   /** 还没展示过的新徽章，按获得顺序 */
   unseen(): StoredUnlock[] {
     return achievementRepo.listUnlocks().filter((u) => !u.seen);
@@ -147,6 +193,7 @@ export const achievementService = {
 
   markSeen(ids: readonly string[]): void {
     achievementRepo.markSeen(ids);
+    if (ids.length > 0) events.emit({ type: 'achievementChanged' });
   },
 
   /** 新徽章可以展示了（停手 1.2 秒后）；返回取消订阅 */

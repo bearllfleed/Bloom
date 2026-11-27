@@ -10,8 +10,9 @@ import { describeRule } from '@/domain/project';
 import { ruleOn } from '@/domain/rule';
 import { completionRateOf, totalCompletedOf } from '@/domain/stats';
 import type { FrequencyRule, ProjectStatus } from '@/domain/types';
+import { BLOOM_BACKUP_FORMAT_VERSION, encodeBloomBackup, type BackupPayload } from '@/data/backup';
+import { moodMediaEntries, verifyMoodMedia } from '@/data/backup/media';
 import { sha256Hex } from '@/data/backup/sha256';
-import { mediaHashes, moodMediaEntries, verifyMoodMedia } from '@/data/backup/media';
 import { unzipStore, zipStore } from '@/data/backup/zipStore';
 import { getDatabase } from '@/data/db/client';
 import { currentVersion } from '@/data/db/migrator';
@@ -30,7 +31,6 @@ import { achievementService } from './achievementService';
 import { events } from './events';
 
 const log = createLogger('backup');
-const FORMAT_VERSION = 1;
 const LAST_BACKUP = 'last_backup_at';
 
 export type BackupError = 'notBackup' | 'corrupt' | 'tooNew' | 'space';
@@ -45,20 +45,7 @@ export interface BackupPreview {
   achievements: number;
 }
 
-interface Payload {
-  formatVersion: number;
-  prefs: Prefs;
-  projects: Record<string, unknown>[];
-  rules: Record<string, unknown>[];
-  pauses: Record<string, unknown>[];
-  reminders: Record<string, unknown>[];
-  checkins: Record<string, unknown>[];
-  moods: Record<string, unknown>[];
-  moodPhotos: Record<string, unknown>[];
-  achievements: Record<string, unknown>[];
-  counters: Record<string, unknown>[];
-  meta: Record<string, unknown>[];
-}
+type Payload = BackupPayload<Prefs>;
 
 export interface ParsedBackup {
   preview: BackupPreview;
@@ -92,7 +79,7 @@ function rows(sql: string): Record<string, unknown>[] {
 function buildPayload(): Payload {
   const { update: _update, ...prefs } = usePrefs.getState();
   return {
-    formatVersion: FORMAT_VERSION,
+    formatVersion: BLOOM_BACKUP_FORMAT_VERSION,
     prefs,
     projects: rows('SELECT * FROM projects'),
     rules: rows('SELECT * FROM project_rules'),
@@ -108,30 +95,17 @@ function buildPayload(): Payload {
 }
 
 function pack(payload: Payload, prefix: string): StoredFile {
-  const data = text.encode(JSON.stringify(payload));
   const media = moodMediaEntries(payload.moodPhotos, files.readMoodPhoto);
-  const manifest = {
-    format: 'bloom-backup',
-    formatVersion: FORMAT_VERSION,
-    schemaVersion: currentVersion(getDatabase()),
-    appVersion,
-    exportedAt: isoLocal(clock.now()),
-    platform: Platform.OS,
-    counts: {
-      projects: payload.projects.filter((row) => row.deleted_at == null).length,
-      checkins: payload.checkins.length,
-      moods: payload.moods.length,
-      photos: payload.moodPhotos.length,
-      achievements: payload.achievements.length,
+  const { bytes } = encodeBloomBackup(
+    payload,
+    {
+      schemaVersion: currentVersion(getDatabase()),
+      appVersion,
+      exportedAt: isoLocal(clock.now()),
+      platform: Platform.OS,
     },
-    sha256: sha256Hex(data),
-    mediaSha256: mediaHashes(media),
-  };
-  const bytes = zipStore([
-    { name: 'manifest.json', data: text.encode(JSON.stringify(manifest)) },
-    { name: 'data.json', data },
-    ...media,
-  ]);
+    media,
+  );
   const name = `${prefix}${stamp(clock.now())}.bloom`;
   return files.write(name, bytes);
 }
@@ -159,10 +133,10 @@ export function parseBackup(uri: string): { ok: true; parsed: ParsedBackup } | {
       mediaSha256?: Record<string, string>;
     };
     if (manifest.format !== 'bloom-backup') return { ok: false, error: 'notBackup' };
-    if ((manifest.formatVersion ?? 0) > FORMAT_VERSION) return { ok: false, error: 'tooNew' };
+    if ((manifest.formatVersion ?? 0) > BLOOM_BACKUP_FORMAT_VERSION) return { ok: false, error: 'tooNew' };
     if (manifest.sha256 !== sha256Hex(dataBytes)) return { ok: false, error: 'corrupt' };
     const payload = JSON.parse(decoder.decode(dataBytes)) as Payload;
-    if (!payload || payload.formatVersion !== 1 || !Array.isArray(payload.projects))
+    if (!payload || payload.formatVersion !== BLOOM_BACKUP_FORMAT_VERSION || !Array.isArray(payload.projects))
       return { ok: false, error: 'corrupt' };
     const media = [...unzipped.entries()]
       .filter(([name]) => name.startsWith('media/mood/'))
@@ -296,12 +270,14 @@ export const backupService = {
     // "有备无患"：导出没有数据事件，单独结算计数器
     achievementRepo.recordBackupExport(now);
     achievementService.settleCounters();
+    events.emit({ type: 'backupChanged' });
   },
 
   /** 导入前自动备份，失败则不允许继续恢复 */
   snapshotBeforeImport(): StoredFile {
     const file = pack(buildPayload(), '导入前自动备份_');
     prune('导入前自动备份_', 8);
+    events.emit({ type: 'backupChanged' });
     return file;
   },
 
@@ -315,6 +291,7 @@ export const backupService = {
       }
       pack(buildPayload(), '自动快照_');
       prune('自动快照_', 4);
+      events.emit({ type: 'backupChanged' });
     } catch (error) {
       log.warn('自动快照失败', error);
     }

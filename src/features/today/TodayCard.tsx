@@ -9,15 +9,14 @@ import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
+import type { MoodEntity } from '@/domain/mood';
 import { canShowProjectMood } from '@/domain/achievement/presentation';
 import { formatClock } from '@/domain/date';
 import type { LocalDate } from '@/domain/types';
 import { moodCopy } from '@/copy/phase3';
 import { blockReasonCopy, todayCopy } from '@/copy/today';
-import { useLiveQuery } from '@/features/common/useLiveQuery';
 import { MoodFaceIcon } from '@/features/mood/MoodFace';
 import { readMoodPath, writeMoodPath } from '@/features/mood/links';
-import { moodService } from '@/services/moodService';
 import type { DayItem } from '@/services/queries';
 import { overlay, type MenuItem } from '@/stores/overlayQueue';
 import { AppText } from '@/ui/components/AppText';
@@ -54,11 +53,13 @@ export function TodayCard({
   item,
   date,
   today,
+  mood,
   pulseToken = 0,
 }: {
   item: DayItem;
   date: LocalDate;
   today: LocalDate;
+  mood: MoodEntity | null;
   /** 变化时把卡片轻轻弹一下，用来响应通知点击 */
   pulseToken?: number;
 }) {
@@ -75,8 +76,7 @@ export function TodayCard({
   }, [pulseToken, scale]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  // 当天该项目的已保存心情：入口只依据"已完成或已有心情"，未来日期不出现
-  const mood = useLiveQuery(() => moodService.getFor(date, project.id), [date, project.id]);
+  // 心情由页面按日期一次性读取后分配给卡片，避免逐卡同步查询。
   const moodEntry = canShowProjectMood({
     completed: state.dayCompleted,
     hasMood: mood !== null,

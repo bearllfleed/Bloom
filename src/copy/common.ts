@@ -22,5 +22,16 @@ export const trustCopy = {
 export const bootCopy = {
   upgradeFailedTitle: '数据升级没有成功',
   upgradeFailedMessage: '你的数据没有变化。导出诊断日志发给开发同学，修复后再装新版本就好',
+  startFailedTitle: 'Bloom 没有成功启动',
+  startFailedMessage: '启动过程中遇到了问题。请导出诊断日志发给开发同学，修复后再重新打开',
   exportLogs: '导出诊断日志',
 } as const;
+
+export function bootFailureCopyFor(reason: import('@/services/lifecycleService').BootFailureReason): {
+  title: string;
+  message: string;
+} {
+  return reason === 'database'
+    ? { title: bootCopy.upgradeFailedTitle, message: bootCopy.upgradeFailedMessage }
+    : { title: bootCopy.startFailedTitle, message: bootCopy.startFailedMessage };
+}

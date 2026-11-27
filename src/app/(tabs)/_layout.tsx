@@ -19,7 +19,7 @@ export default function TabsLayout() {
   const onboarded = usePrefs((s) => s.onboarded);
   if (!onboarded) return <Redirect href="/welcome" />;
   return (
-    <Tabs options={{ screenLayout: focusGateLayout }}>
+    <Tabs activityEnabled options={{ screenLayout: focusGateLayout }}>
       <View style={[styles.body, { backgroundColor: colors.background }]}>
         <TabSlot />
       </View>

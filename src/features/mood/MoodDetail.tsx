@@ -86,7 +86,7 @@ export function MoodDetail({ id }: { id: string }) {
   const moreAnchor = useRef<ComponentRef<typeof View>>(null);
 
   // 数据版本变化（编辑、删除、导入）后自动重读
-  const mood = useLiveQuery(() => moodService.getById(id), [id]);
+  const mood = useLiveQuery(() => moodService.getById(id), [id], ['moods']);
 
   // 进入时表情轻弹一次；减弱动态时直接显示
   const faceScale = useSharedValue(reduced ? 1 : 0.82);

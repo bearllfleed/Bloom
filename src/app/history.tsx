@@ -121,11 +121,11 @@ export default function HistoryScreen() {
   const [filter, setFilter] = useState<string | null>(params.projectId ?? null);
   const [loaded, setLoaded] = useState(PAGE_MONTHS);
 
-  const projects = useLiveQuery(listProjects, []);
+  const projects = useLiveQuery(listProjects, [], ['projects']);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
-  const months = useLiveQuery(() => getHistoryMonths(filter), [filter]);
+  const months = useLiveQuery(() => getHistoryMonths(filter), [filter], ['projects', 'checkins']);
   // 记录列表一次取出心情索引，不为每一行单独查库
-  const moodIndex = useLiveQuery(() => moodMarkerMap(moodService.list()), []);
+  const moodIndex = useLiveQuery(() => moodMarkerMap(moodService.list()), [], ['moods']);
   const sections = useLiveQuery(
     () =>
       months.slice(0, loaded).map((m) => ({
@@ -134,6 +134,7 @@ export default function HistoryScreen() {
         data: getHistoryMonth(m.month, filter),
       })),
     [months, loaded, filter],
+    ['projects', 'checkins'],
   );
 
   return (

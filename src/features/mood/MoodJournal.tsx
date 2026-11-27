@@ -93,7 +93,7 @@ export function MoodJournal() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const [filter, setFilter] = useState<Filter>('all');
-  const moods = useLiveQuery(() => moodService.list({ hasPhotos: filter === 'photos' }), [filter]);
+  const moods = useLiveQuery(() => moodService.list({ hasPhotos: filter === 'photos' }), [filter], ['moods']);
   const groups = journalMonths(moods);
 
   return (

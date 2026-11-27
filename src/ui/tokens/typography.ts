@@ -35,3 +35,9 @@ export const type = {
 } satisfies Record<string, TypeStyle>;
 
 export type TypeVariant = keyof typeof type;
+
+/** 字体未成功注册时移除自定义字体名，让 React Native 使用系统字体。 */
+export function resolveTypeStyle(variant: TypeVariant, customFontsAvailable: boolean): TextStyle {
+  const style: TextStyle = type[variant];
+  return !customFontsAvailable && style.fontFamily ? { ...style, fontFamily: undefined } : style;
+}

@@ -64,7 +64,16 @@ export const reminderService = {
   start(): void {
     if (started) return;
     started = true;
-    events.subscribe(() => reminderService.kick());
+    events.subscribe((event) => {
+      if (
+        event.type === 'checkinChanged' ||
+        event.type === 'projectChanged' ||
+        event.type === 'projectsChanged' ||
+        event.type === 'dataReplaced'
+      ) {
+        reminderService.kick();
+      }
+    });
     this.kick();
   },
 

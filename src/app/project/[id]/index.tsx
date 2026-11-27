@@ -45,12 +45,16 @@ export default function ProjectDetailScreen() {
   const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const weekStart = usePrefs((s) => s.weekStart);
-  const summary = useLiveQuery(() => getProjectSummary(id), [id]);
-  const recent = useLiveQuery(() => getRecentRecords(id, 5), [id]);
-  const notes = useLiveQuery(() => projectNotes(id, 3), [id]);
+  const summary = useLiveQuery(() => getProjectSummary(id), [id], ['projects', 'checkins', 'clock']);
+  const recent = useLiveQuery(() => getRecentRecords(id, 5), [id], ['checkins']);
+  const notes = useLiveQuery(() => projectNotes(id, 3), [id], ['checkins']);
   const [view, setView] = useState<'month' | 'year'>('month');
   const year = Number(clock.today().slice(0, 4));
-  const yearCells = useLiveQuery(() => (view === 'year' ? projectYearCells(id, year) : []), [id, view, year]);
+  const yearCells = useLiveQuery(
+    () => (view === 'year' ? projectYearCells(id, year) : []),
+    [id, view, year],
+    ['projects', 'checkins', 'clock'],
+  );
   const moreAnchor = useRef<ComponentRef<typeof View>>(null);
 
   if (!summary) {

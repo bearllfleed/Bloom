@@ -17,6 +17,7 @@ const displayName = variant === 'production' ? 'Bloom' : variant === 'preview' ?
 
 const PAPER = '#FFF8F3';
 const NIGHT = '#211A1E';
+const enableRemoteNotifications = process.env.BLOOM_LOCAL_IOS_PERSONAL_TEAM !== '1';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -96,6 +97,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-notifications',
       {
         color: '#FF8FB8',
+        enableRemoteNotifications,
       },
     ],
     'expo-localization',
@@ -106,7 +108,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         imageWidth: 160,
         resizeMode: 'contain',
         backgroundColor: PAPER,
-        dark: { image: './assets/images/splash-icon.png', backgroundColor: NIGHT },
+        dark: { image: './assets/images/splash-icon-dark.png', backgroundColor: NIGHT },
       },
     ],
     [

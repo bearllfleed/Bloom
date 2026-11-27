@@ -33,10 +33,11 @@ export function Ceremony({ projectId, onDone }: { projectId: string; onDone: () 
   const reduced = useMotionReduced();
   const { colors } = useTheme();
   const nickname = usePrefs((s) => s.nickname);
-  const summary = useLiveQuery(() => getProjectSummary(projectId), [projectId]);
+  const summary = useLiveQuery(() => getProjectSummary(projectId), [projectId], ['projects', 'checkins', 'clock']);
   const remaining = useLiveQuery(
     () => Math.max(0, projectService.unseenGraduations().filter((project) => project.id !== projectId).length),
     [projectId],
+    ['projects'],
   );
 
   useEffect(() => {

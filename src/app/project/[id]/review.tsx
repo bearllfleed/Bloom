@@ -37,11 +37,11 @@ export default function ReviewScreen() {
   const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const dayEndHour = usePrefs((s) => s.dayEndHour);
-  const summary = useLiveQuery(() => getProjectSummary(id), [id]);
-  const project = useLiveQuery(() => getProject(id), [id]);
-  const records = useLiveQuery(() => getProjectRecords(id), [id]);
-  const moods = useLiveQuery(() => moodService.listForProject(id), [id]);
-  const unlocks = useLiveQuery(() => achievementService.unlocked(), []);
+  const summary = useLiveQuery(() => getProjectSummary(id), [id], ['projects', 'checkins', 'clock']);
+  const project = useLiveQuery(() => getProject(id), [id], ['projects']);
+  const records = useLiveQuery(() => getProjectRecords(id), [id], ['checkins']);
+  const moods = useLiveQuery(() => moodService.listForProject(id), [id], ['moods']);
+  const unlocks = useLiveQuery(() => achievementService.unlocked(), [], ['achievements']);
 
   if (!summary || !project) {
     return (

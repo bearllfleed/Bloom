@@ -24,7 +24,7 @@ import { radius, space } from '@/ui/tokens';
 
 function DayRecordsContent({ projectId, date }: { projectId: string; date: LocalDate }) {
   const { colors } = useTheme();
-  const view = useLiveQuery(() => getDayRecords(projectId, date), [projectId, date]);
+  const view = useLiveQuery(() => getDayRecords(projectId, date), [projectId, date], ['projects', 'checkins', 'clock']);
   if (!view) return null;
   const { project, state, records } = view;
   const status =
